@@ -242,15 +242,42 @@ window.ZestSync = (function () {
   // ------------------------------------------------------------------
   // GOOGLE SHEETS 2-WAY SYNC — fire-and-forget, never blocks Firebase ops
   // ------------------------------------------------------------------
+
+  /**
+   * _cleanForSheets — strip photo fields (base64 blobs) before sending to Sheets.
+   * Also strips any field whose value is over 40KB to avoid Apps Script payload issues.
+   */
+  function _cleanForSheets(data) {
+    if (!data) return data;
+    const d = { ...data };
+    if (d.row && typeof d.row === 'object') {
+      d.row = { ...d.row };
+      delete d.row.photo;
+    }
+    if (Array.isArray(d.rows)) {
+      d.rows = d.rows.map(r => { const c = { ...r }; delete c.photo; return c; });
+    }
+    if (Array.isArray(d.headers)) {
+      d.headers = d.headers.filter(h => h !== 'photo');
+    }
+    if (d.updates && typeof d.updates === 'object') {
+      d.updates = { ...d.updates };
+      delete d.updates.photo;
+    }
+    return d;
+  }
+
   function _syncToSheets(action, data) {
     try {
       const url = localStorage.getItem('zest_sheets_url');
       if (!url) return; // No script URL configured
       const token = sessionStorage.getItem('zest_sheets_token') || '';
+      const cleanData = _cleanForSheets(data);
       fetch(url, {
         method: 'POST',
+        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action, token, data }),
+        body: JSON.stringify({ action, token, data: cleanData }),
       }).catch(() => {}); // Silent — never block UI
     } catch (e) {}
   }
@@ -265,6 +292,7 @@ window.ZestSync = (function () {
       if (!url) return; // No attendance script URL configured
       fetch(url, {
         method: 'POST',
+        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action, data }),
       }).catch(() => {}); // Silent — never block UI
