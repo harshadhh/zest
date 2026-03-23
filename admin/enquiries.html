@@ -251,6 +251,28 @@
     renderEnquiries();
   }
 
+  function editEnquiry(id) {
+    document.getElementById('enqView_' + id).style.display = 'none';
+    document.getElementById('enqEdit_' + id).style.display = '';
+  }
+
+  async function saveEnquiryEdit(id) {
+    try {
+      const updates = {
+        studentName: document.getElementById('eedit_name_' + id).value.trim(),
+        parentName:  document.getElementById('eedit_parent_' + id).value.trim(),
+        phone:       document.getElementById('eedit_phone_' + id).value.trim(),
+        email:       document.getElementById('eedit_email_' + id).value.trim(),
+        interest:    document.getElementById('eedit_interest_' + id).value,
+        source:      document.getElementById('eedit_source_' + id).value,
+      };
+      if (!updates.studentName || !updates.phone) { alert('Student name and phone are required.'); return; }
+      await ZestSync.updateRow('enquiries', 'zest_enquiries', id, updates);
+      enquiries = await ZestSync.getAll('enquiries', 'zest_enquiries');
+      renderEnquiries();
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
   async function deleteEnq(id) {
     if(!confirm('Delete this enquiry?')) return;
     await ZestSync.deleteRow('enquiries','zest_enquiries','id',id);
@@ -272,7 +294,7 @@
     document.getElementById('convertedEnq').textContent = enquiries.filter(e=>e.status==='converted').length;
     const tbody = document.getElementById('enqBody');
     if(!filtered.length) { tbody.innerHTML='<tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No enquiries found.</td></tr>'; return; }
-    tbody.innerHTML = [...filtered].reverse().map(e => `<tr>
+    tbody.innerHTML = [...filtered].reverse().map(e => `<tr id="enqView_${esc(e.id)}">
       <td><div style="font-weight:600;">${esc(e.studentName)}</div><div style="font-size:.75rem;color:rgba(255,255,255,.35);">${esc(e.parentName)}</div></td>
       <td><a href="tel:${esc(e.phone)}" style="color:rgba(235,168,33,.8);">${esc(e.phone)}</a></td>
       <td style="font-size:.83rem;">${esc(e.interest)||'—'}</td>
@@ -285,7 +307,30 @@
         </select>
       </td>
       <td style="font-size:.82rem;">${esc(e.date)||'—'}</td>
-      <td><button onclick="deleteEnq('${esc(e.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.2);padding:.3rem .6rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">✕</button></td>
+      <td style="white-space:nowrap;">
+        <button onclick="editEnquiry('${esc(e.id)}')" style="background:none;border:none;color:rgba(235,168,33,.6);cursor:pointer;font-size:.8rem;" title="Edit">✏️</button>
+        <button onclick="deleteEnq('${esc(e.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.2);padding:.3rem .6rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">✕</button>
+      </td>
+    </tr>
+    <tr id="enqEdit_${esc(e.id)}" style="display:none;">
+      <td colspan="7" style="padding:.75rem;">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.5rem;">
+          <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Student</label><input type="text" id="eedit_name_${esc(e.id)}" value="${esc(e.studentName||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+          <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Parent</label><input type="text" id="eedit_parent_${esc(e.id)}" value="${esc(e.parentName||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+          <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Phone</label><input type="text" id="eedit_phone_${esc(e.id)}" value="${esc(e.phone||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+          <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Email</label><input type="email" id="eedit_email_${esc(e.id)}" value="${esc(e.email||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+          <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Interest</label><select id="eedit_interest_${esc(e.id)}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;">
+            ${['Admission','Fee Enquiry','Course Info','General','Other'].map(o=>'<option value="'+o+'" '+(e.interest===o?'selected':'')+'>'+o+'</option>').join('')}
+          </select></div>
+          <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Source</label><select id="eedit_source_${esc(e.id)}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;">
+            ${['Walk-in','Phone Call','WhatsApp','Social Media','Website','Referral','Other'].map(o=>'<option value="'+o+'" '+(e.source===o?'selected':'')+'>'+o+'</option>').join('')}
+          </select></div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+          <button onclick="saveEnquiryEdit('${esc(e.id)}')" style="background:linear-gradient(135deg,#EBA821,#C98A10);color:#0F1E3D;border:none;padding:.4rem .8rem;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">💾 Save</button>
+          <button onclick="document.getElementById('enqEdit_${esc(e.id)}').style.display='none';document.getElementById('enqView_${esc(e.id)}').style.display='';" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1);padding:.4rem .8rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">Cancel</button>
+        </div>
+      </td>
     </tr>`).join('');
   }
 
