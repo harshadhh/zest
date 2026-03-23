@@ -304,6 +304,7 @@ body.admin-body {
   font-family: 'Outfit', sans-serif;
   font-size: .9rem;
   color: white;
+  color-scheme: dark;
   outline: none;
   transition: border-color .2s, box-shadow .2s;
 }
@@ -316,6 +317,15 @@ body.admin-body {
 }
 
 .admin-form select option {
+  background: #0F1E3D;
+  color: white;
+}
+
+/* Global: ensure ALL selects use dark theme for native dropdowns */
+select {
+  color-scheme: dark;
+}
+select option {
   background: #0F1E3D;
   color: white;
 }
