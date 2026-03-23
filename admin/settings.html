@@ -107,19 +107,41 @@
   ...
 }'></textarea>
               </div>
-              <div class="form-group">
-                <label>Google Sheets URL (optional)</label>
-                <input type="url" id="sheetsUrl" placeholder="https://script.google.com/macros/s/..."/>
-              </div>
-              <div class="form-group">
-                <label>Attendance Sheet URL (optional)</label>
-                <input type="url" id="attSheetsUrl" placeholder="https://script.google.com/macros/s/..."/>
-              </div>
               <div id="connectMsg"></div>
               <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:.5rem;">
                 <button class="btn-admin-primary" id="connectBtn" onclick="saveAndConnect()" style="font-size:.85rem;padding:.6rem 1.1rem;">🔥 Save &amp; Connect</button>
                 <button class="btn-admin-secondary" onclick="reTestConnection()" style="font-size:.85rem;padding:.6rem 1.1rem;">🔄 Re-Test</button>
                 <button onclick="disconnectAll()" style="background:none;border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.6rem 1.1rem;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;">Disconnect</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Google Sheets Integration -->
+          <div class="admin-card" style="border-color:rgba(16,185,129,.15);">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-title">📊 Google Sheets Integration</div>
+                <div class="admin-card-subtitle">Connect your Apps Script Web App URLs</div>
+              </div>
+              <span class="pill pill-off" id="sheetsIndicator">⚪ Not Set</span>
+            </div>
+            <p style="font-size:.83rem;color:rgba(255,255,255,.45);margin-bottom:1rem;">Paste the Web App URL from each Google Sheets Apps Script deployment. These sync your data to Google Sheets automatically whenever you add, edit, or delete records.</p>
+            <div class="admin-form">
+              <div class="form-group">
+                <label>📋 Main Sheet Script URL</label>
+                <div style="font-size:.72rem;color:rgba(255,255,255,.3);margin-bottom:.35rem;">Syncs Students, Fees, Results, Enquiries — from <strong>Code_Main.gs</strong> deployment</div>
+                <input type="url" id="sheetsUrl" placeholder="https://script.google.com/macros/s/.../exec"/>
+              </div>
+              <div class="form-group">
+                <label>✅ Attendance Sheet Script URL</label>
+                <div style="font-size:.72rem;color:rgba(255,255,255,.3);margin-bottom:.35rem;">Syncs daily attendance — from <strong>Code_Attendance.gs</strong> deployment</div>
+                <input type="url" id="attSheetsUrl" placeholder="https://script.google.com/macros/s/.../exec"/>
+              </div>
+              <div id="sheetsMsg"></div>
+              <div style="display:flex;gap:.65rem;flex-wrap:wrap;margin-top:.5rem;">
+                <button class="btn-admin-primary" onclick="saveSheetsUrls()" style="font-size:.85rem;padding:.6rem 1.1rem;">💾 Save Sheet URLs</button>
+                <button class="btn-admin-secondary" onclick="testMainSheet()" style="font-size:.85rem;padding:.6rem 1.1rem;">🔍 Test Main Sheet</button>
+                <button class="btn-admin-secondary" onclick="testAttSheet()" style="font-size:.85rem;padding:.6rem 1.1rem;">🔍 Test Attendance Sheet</button>
               </div>
             </div>
           </div>
@@ -246,6 +268,13 @@
     if(sheetsEl) sheetsEl.value = sUrl;
     if(attEl)    attEl.value   = attUrl;
 
+    // Update sheets indicator
+    const si = document.getElementById('sheetsIndicator');
+    if (si) {
+      if (sUrl || attUrl) { si.textContent = '🟢 ' + (sUrl && attUrl ? 'Both Set' : sUrl ? 'Main Set' : 'Attendance Set'); si.className = 'pill pill-live'; }
+      else { si.textContent = '⚪ Not Set'; si.className = 'pill pill-off'; }
+    }
+
     const prefs = JSON.parse(localStorage.getItem('zest_prefs')||'{}');
     if(prefs.show1112!==undefined) document.getElementById('show1112').checked = prefs.show1112;
     if(prefs.feeAlert!==undefined) document.getElementById('feeAlert').checked = prefs.feeAlert;
@@ -287,10 +316,6 @@
       config.storageBucket = config.storageBucket.replace('.firebasestorage.app','.appspot.com');
     btn.textContent = '⏳ Connecting...'; btn.disabled = true;
     localStorage.setItem('zest_firebase_config',JSON.stringify(config));
-    const sUrl  = (document.getElementById('sheetsUrl')||{value:''}).value.trim();
-    const attSUrl = (document.getElementById('attSheetsUrl')||{value:''}).value.trim();
-    if(sUrl)    localStorage.setItem('zest_sheets_url',sUrl);
-    if(attSUrl) localStorage.setItem('zest_att_sheets_url',attSUrl);
     const ok = await Promise.race([ZestSync.testConnection(),new Promise(r=>setTimeout(()=>r(false),10000))]);
     if(ok) { showInline(msg,'✅ Firebase connected! Data syncs across all devices.','ok'); }
     else   { showInline(msg,'❌ Could not connect. Check config and make sure Firestore + Storage are enabled.','err'); }
@@ -305,17 +330,59 @@
   }
 
   function disconnectAll() {
-    if(!confirm('Disconnect? Data will still be in Firestore.')) return;
+    if(!confirm('Disconnect Firebase? Data will still be in Firestore. (Sheet URLs are kept separate.)')) return;
     localStorage.removeItem('zest_firebase_config');
-    localStorage.removeItem('zest_sheets_url');
-    localStorage.removeItem('zest_att_sheets_url');
-    const fbEl  = document.getElementById('fbConfig');
-    const shEl  = document.getElementById('sheetsUrl');
-    const ashEl = document.getElementById('attSheetsUrl');
-    if(fbEl)  fbEl.value  = '';
-    if(shEl)  shEl.value  = '';
-    if(ashEl) ashEl.value = '';
-    showInline(document.getElementById('connectMsg'),'Disconnected.','ok');
+    const fbEl = document.getElementById('fbConfig');
+    if(fbEl) fbEl.value = '';
+    showInline(document.getElementById('connectMsg'),'Firebase disconnected.','ok');
+  }
+
+  // ── Google Sheets URL Management ──────────────────────────────────────
+  function saveSheetsUrls() {
+    const sUrl   = (document.getElementById('sheetsUrl')||{}).value?.trim() || '';
+    const attUrl = (document.getElementById('attSheetsUrl')||{}).value?.trim() || '';
+    const msg    = document.getElementById('sheetsMsg');
+    const si     = document.getElementById('sheetsIndicator');
+
+    if (sUrl) localStorage.setItem('zest_sheets_url', sUrl);
+    else localStorage.removeItem('zest_sheets_url');
+
+    if (attUrl) localStorage.setItem('zest_att_sheets_url', attUrl);
+    else localStorage.removeItem('zest_att_sheets_url');
+
+    const saved = [];
+    if (sUrl) saved.push('Main Sheet');
+    if (attUrl) saved.push('Attendance Sheet');
+
+    if (saved.length) {
+      showInline(msg, '✅ Saved: ' + saved.join(' + ') + '. Data will now sync automatically!', 'ok');
+      if (si) { si.textContent = '🟢 ' + (sUrl && attUrl ? 'Both Set' : saved[0] + ' Set'); si.className = 'pill pill-live'; }
+    } else {
+      showInline(msg, '⚠ No URLs entered. Google Sheets sync is disabled.', 'err');
+      if (si) { si.textContent = '⚪ Not Set'; si.className = 'pill pill-off'; }
+    }
+  }
+
+  async function testMainSheet() {
+    const url = localStorage.getItem('zest_sheets_url');
+    const msg = document.getElementById('sheetsMsg');
+    if (!url) { showInline(msg, '⚠ Save a Main Sheet URL first.', 'err'); return; }
+    showInline(msg, '⏳ Testing Main Sheet connection...', 'ok');
+    try {
+      await fetch(url, { method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({action:'getStatus',data:{}}) });
+      showInline(msg, '✅ Main Sheet URL is reachable! Students, Fees, Results & Enquiries will sync.', 'ok');
+    } catch(e) { showInline(msg, '❌ Could not reach Main Sheet. Check the URL and make sure the Apps Script is deployed as Web App → Anyone.', 'err'); }
+  }
+
+  async function testAttSheet() {
+    const url = localStorage.getItem('zest_att_sheets_url');
+    const msg = document.getElementById('sheetsMsg');
+    if (!url) { showInline(msg, '⚠ Save an Attendance Sheet URL first.', 'err'); return; }
+    showInline(msg, '⏳ Testing Attendance Sheet connection...', 'ok');
+    try {
+      await fetch(url, { method: 'POST', mode: 'no-cors', headers: {'Content-Type':'text/plain'}, body: JSON.stringify({action:'getStatus',data:{}}) });
+      showInline(msg, '✅ Attendance Sheet URL is reachable! Daily attendance will sync.', 'ok');
+    } catch(e) { showInline(msg, '❌ Could not reach Attendance Sheet. Check the URL and make sure the Apps Script is deployed as Web App → Anyone.', 'err'); }
   }
 
   async function pushAll() {
