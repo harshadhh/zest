@@ -282,23 +282,40 @@
       m.style.cssText = 'display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:1rem;';
     }
   }
-  // Compress image to max 800px, JPEG quality 0.6 (~50-150KB, well under 1MB Firestore limit)
-  function compressImage(dataUrl, maxSize, quality) {
-    maxSize = maxSize || 800; quality = quality || 0.6;
+  // ── Image compression ───────────────────────────────────────
+  // Accepts up to 5MB input. Compresses iteratively until
+  // the base64 output is under 700KB (safe for Firestore's 1MB limit).
+  const MAX_PHOTO_BYTES = 700 * 1024; // 700KB safe limit
+
+  function compressImage(dataUrl) {
     return new Promise(resolve => {
       const img = new Image();
-      img.onload = () => {
-        let w = img.width, h = img.height;
-        if (w > maxSize || h > maxSize) {
-          if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
-          else       { w = Math.round(w * maxSize / h); h = maxSize; }
+      img.onload = async () => {
+        let maxDim = 600, quality = 0.6;
+        let result = dataUrl;
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+            else       { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          result = c.toDataURL('image/jpeg', quality);
+
+          // Check size (base64 is ~33% larger than raw bytes)
+          const sizeBytes = Math.round(result.length * 0.75);
+          if (sizeBytes <= MAX_PHOTO_BYTES) break;
+
+          // Shrink further for next attempt
+          maxDim = Math.round(maxDim * 0.7);
+          quality = Math.max(0.2, quality - 0.1);
         }
-        const c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(c.toDataURL('image/jpeg', quality));
+        resolve(result);
       };
-      img.onerror = () => resolve(dataUrl); // fallback to original
+      img.onerror = () => resolve(dataUrl);
       img.src = dataUrl;
     });
   }
@@ -316,14 +333,18 @@
     document.getElementById('camModal').classList.remove('open');
   }
   function handleFileSelect(input) {
-    const file = input.files[0]; if(!file||!file.type.startsWith('image/')) return;
+    const file = input.files[0]; if(!file) return;
+    if(!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+    if(file.size > 5 * 1024 * 1024) { alert('Photo must be under 5MB.'); return; }
     const reader = new FileReader();
     reader.onload = e => compressImage(e.target.result).then(setPhoto);
     reader.readAsDataURL(file);
   }
   function handleDrop(e) {
     e.preventDefault();
-    const file = e.dataTransfer.files[0]; if(!file||!file.type.startsWith('image/')) return;
+    const file = e.dataTransfer.files[0]; if(!file) return;
+    if(!file.type.startsWith('image/')) return;
+    if(file.size > 5 * 1024 * 1024) { alert('Photo must be under 5MB.'); return; }
     const reader = new FileReader();
     reader.onload = ev => compressImage(ev.target.result).then(setPhoto);
     reader.readAsDataURL(file);
@@ -414,12 +435,22 @@
       };
       if (photoData) {
         try {
+          // Try Firebase Storage first (15s timeout)
           const photoUrl = await Promise.race([
             ZestSync.uploadPhoto(student.id, photoData),
-            new Promise(res => setTimeout(() => res(''), 8000))
+            new Promise(res => setTimeout(() => res(''), 15000))
           ]);
-          student.photo = photoUrl || photoData;
-        } catch(e) { student.photo = photoData; }
+          if (photoUrl) {
+            student.photo = photoUrl; // ✅ URL from Firebase Storage
+          } else {
+            // Storage failed — only store compressed base64 if small enough
+            const photoBytes = Math.round(photoData.length * 0.75);
+            student.photo = photoBytes <= MAX_PHOTO_BYTES ? photoData : '';
+          }
+        } catch(e) {
+          const photoBytes = Math.round(photoData.length * 0.75);
+          student.photo = photoBytes <= MAX_PHOTO_BYTES ? photoData : '';
+        }
       }
       await ZestSync.appendRow(COLLECTION, LOCAL_KEY, student);
       students = await ZestSync.getAll(COLLECTION, LOCAL_KEY);
@@ -457,28 +488,139 @@
     const avatarHtml = s.photo
       ? `<img src="${esc(s.photo)}" style="width:80px;height:80px;border-radius:12px;object-fit:cover;cursor:pointer;" onclick="window.open('${esc(s.photo)}','_blank')"/>`
       : `<div style="width:80px;height:80px;border-radius:12px;background:linear-gradient(135deg,#1B365D,#EBA821);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:2rem;font-weight:900;color:#0F1E3D;">${esc((s.name||'?').charAt(0).toUpperCase())}</div>`;
+
+    const fields = [
+      { key:'name',      label:'Name',       type:'text' },
+      { key:'parent',    label:'Parent',      type:'text' },
+      { key:'grade',     label:'Grade',       type:'select', options:['','5th Standard','6th Standard','7th Standard','8th Standard','9th Standard','10th Standard','11th Standard','12th Standard'] },
+      { key:'board',     label:'Board',       type:'select', options:['','State Board','CBSE','ICSE','IB','Other'] },
+      { key:'batch',     label:'Batch',       type:'select', options:['','Regular Morning','Regular Evening','Weekend Batch','Special Batch'] },
+      { key:'phone',     label:'Phone',       type:'text' },
+      { key:'fee',       label:'Annual Fee',  type:'number' },
+      { key:'feeStatus', label:'Fee Status',  type:'select', options:['Pending','Paid','Partial','Overdue'] },
+      { key:'address',   label:'Address',     type:'text' },
+      { key:'joinDate',  label:'Joined',      type:'date' },
+    ];
+
+    // View mode
+    const viewGrid = fields.map(f => {
+      let val = s[f.key] || '—';
+      if (f.key === 'fee') val = '₹' + parseFloat(s.fee||0).toLocaleString('en-IN');
+      return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:.65rem .9rem;">
+        <div style="font-size:.7rem;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.08em;text-transform:uppercase;">${esc(f.label)}</div>
+        <div style="font-size:.88rem;color:white;margin-top:.2rem;">${esc(val)}</div>
+      </div>`;
+    }).join('');
+
+    // Edit mode (hidden initially)
+    const editGrid = fields.map(f => {
+      let input = '';
+      if (f.type === 'select') {
+        input = `<select id="edit_${f.key}" style="width:100%;padding:.5rem .65rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;color:white;font-family:'Outfit',sans-serif;font-size:.85rem;">
+          ${f.options.map(o => `<option value="${esc(o)}" ${(s[f.key]||'')===o?'selected':''}>${esc(o||'— Select —')}</option>`).join('')}
+        </select>`;
+      } else {
+        input = `<input type="${f.type}" id="edit_${f.key}" value="${esc(s[f.key]||'')}"
+          style="width:100%;padding:.5rem .65rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;color:white;font-family:'Outfit',sans-serif;font-size:.85rem;box-sizing:border-box;"/>`;
+      }
+      return `<div>
+        <div style="font-size:.7rem;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.3rem;">${esc(f.label)}</div>
+        ${input}
+      </div>`;
+    }).join('');
+
     document.getElementById('popupContent').innerHTML = `
       <div style="display:flex;gap:1.25rem;margin-bottom:1.5rem;align-items:flex-start;">
         ${avatarHtml}
         <div>
-          <div style="font-size:1.15rem;font-weight:700;color:white;">${esc(s.name)}</div>
+          <div id="popupStudentName" style="font-size:1.15rem;font-weight:700;color:white;">${esc(s.name)}</div>
           <div style="font-size:.83rem;color:rgba(255,255,255,.4);margin-top:.2rem;">${esc(s.grade)} · ${esc(s.batch)}</div>
           <span class="status-badge ${esc((s.feeStatus||'pending').toLowerCase())}" style="margin-top:.5rem;display:inline-block;">${esc(s.feeStatus)||'Pending'}</span>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.5rem;">
-        ${[['Parent',s.parent],['Board',s.board],['Phone',s.phone],['Annual Fee','₹'+parseFloat(s.fee||0).toLocaleString('en-IN')],['Address',s.address],['Joined',s.joinDate]].map(([l,v])=>`
-          <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:.65rem .9rem;">
-            <div style="font-size:.7rem;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.08em;text-transform:uppercase;">${esc(l)}</div>
-            <div style="font-size:.88rem;color:white;margin-top:.2rem;">${esc(v)||'—'}</div>
-          </div>`).join('')}
+
+      <!-- VIEW MODE -->
+      <div id="viewMode_${esc(s.id)}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.5rem;">
+          ${viewGrid}
+        </div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+          <a href="tel:${esc(s.phone)}" class="btn-admin-primary" style="text-decoration:none;padding:.6rem 1.2rem;font-size:.85rem;">📞 Call</a>
+          <button onclick="enterEditMode('${esc(s.id)}')" style="background:rgba(235,168,33,.1);color:#EBA821;border:1px solid rgba(235,168,33,.25);padding:.6rem 1.2rem;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;">✏️ Edit</button>
+          <button onclick="deleteStudent('${esc(s.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.25);padding:.6rem 1.2rem;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;">🗑 Delete</button>
+        </div>
       </div>
-      <div style="display:flex;gap:.75rem;">
-        <a href="tel:${esc(s.phone)}" class="btn-admin-primary" style="text-decoration:none;padding:.6rem 1.2rem;font-size:.85rem;">📞 Call</a>
-        <button onclick="deleteStudent('${esc(s.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.25);padding:.6rem 1.2rem;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;">🗑 Delete</button>
+
+      <!-- EDIT MODE (hidden) -->
+      <div id="editMode_${esc(s.id)}" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;">
+          ${editGrid}
+        </div>
+        <div id="editMsg_${esc(s.id)}" style="display:none;margin-bottom:.75rem;"></div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+          <button id="saveEditBtn_${esc(s.id)}" onclick="saveStudentEdit('${esc(s.id)}')" class="btn-admin-primary" style="padding:.6rem 1.5rem;font-size:.85rem;">💾 Save Changes</button>
+          <button onclick="cancelEditMode('${esc(s.id)}')" class="btn-admin-secondary" style="padding:.6rem 1.2rem;font-size:.85rem;">Cancel</button>
+        </div>
       </div>`;
+
     document.getElementById('studentModal').classList.add('open');
     document.body.style.overflow = 'hidden';
+  }
+
+  function enterEditMode(id) {
+    document.getElementById('viewMode_' + id).style.display = 'none';
+    document.getElementById('editMode_' + id).style.display = 'block';
+  }
+
+  function cancelEditMode(id) {
+    document.getElementById('editMode_' + id).style.display = 'none';
+    document.getElementById('viewMode_' + id).style.display = 'block';
+  }
+
+  let _editSaving = false;
+  async function saveStudentEdit(id) {
+    if (_editSaving) return;
+    _editSaving = true;
+    const btn = document.getElementById('saveEditBtn_' + id);
+    const msgEl = document.getElementById('editMsg_' + id);
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:.5rem;"><svg width="14" height="14" viewBox="0 0 16 16" style="animation:spin .7s linear infinite;"><circle cx="8" cy="8" r="6" fill="none" stroke="rgba(15,30,61,.4)" stroke-width="2"/><path d="M8 2 A6 6 0 0 1 14 8" fill="none" stroke="#0F1E3D" stroke-width="2" stroke-linecap="round"/></svg>Saving...</span>';
+
+    try {
+      const updates = {
+        name:      document.getElementById('edit_name').value.trim(),
+        parent:    document.getElementById('edit_parent').value.trim(),
+        grade:     document.getElementById('edit_grade').value,
+        board:     document.getElementById('edit_board').value,
+        batch:     document.getElementById('edit_batch').value,
+        phone:     document.getElementById('edit_phone').value.trim(),
+        fee:       document.getElementById('edit_fee').value,
+        feeStatus: document.getElementById('edit_feeStatus').value,
+        address:   document.getElementById('edit_address').value.trim(),
+        joinDate:  document.getElementById('edit_joinDate').value,
+      };
+
+      if (!updates.name || !updates.grade || !updates.phone) {
+        throw new Error('Name, Grade and Phone are required.');
+      }
+
+      await ZestSync.updateRow(COLLECTION, LOCAL_KEY, id, updates);
+      students = await ZestSync.getAll(COLLECTION, LOCAL_KEY);
+      renderStudents();
+
+      msgEl.textContent = '✅ Changes saved!';
+      msgEl.style.cssText = 'display:block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#6EE7B7;padding:.6rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;';
+
+      // Refresh popup with updated data after short delay
+      setTimeout(() => openStudentPopup(id), 800);
+    } catch(e) {
+      msgEl.textContent = '❌ ' + e.message;
+      msgEl.style.cssText = 'display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.6rem .9rem;border-radius:8px;font-size:.82rem;font-weight:600;';
+    } finally {
+      _editSaving = false;
+      btn.disabled = false;
+      btn.innerHTML = '💾 Save Changes';
+    }
   }
 
   function closeStudentPopup() {
