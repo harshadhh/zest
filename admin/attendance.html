@@ -207,11 +207,14 @@
   function markAll(status) { _filteredStudents.forEach(s => setStatus(s.id, status)); }
 
   function updateSummary() {
-    const present = Object.values(currentStatus).filter(v => v==='present').length;
-    const absent  = Object.values(currentStatus).filter(v => v==='absent').length;
-    const leave   = Object.values(currentStatus).filter(v => v==='leave').length;
+    // Count only filtered students' statuses
+    const filteredIds = new Set(_filteredStudents.map(s => s.id));
+    const filteredStatuses = Object.entries(currentStatus).filter(([id]) => filteredIds.has(id)).map(([,v]) => v);
+    const present = filteredStatuses.filter(v => v==='present').length;
+    const absent  = filteredStatuses.filter(v => v==='absent').length;
+    const leave   = filteredStatuses.filter(v => v==='leave').length;
     document.getElementById('attSummary').innerHTML = `
-      <span class="att-pill total">👥 ${_allStudents.length} Total</span>
+      <span class="att-pill total">👥 ${_filteredStudents.length} Total</span>
       <span class="att-pill present">✅ ${present} Present</span>
       <span class="att-pill absent">❌ ${absent} Absent</span>
       <span class="att-pill" style="background:rgba(235,168,33,.1);color:#EBA821;border:1px solid rgba(235,168,33,.2);">🏖 ${leave} Leave</span>`;
@@ -223,10 +226,18 @@
     const saveBtn = document.querySelector('.admin-header .btn-admin-primary');
     if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving...'; }
     const date = document.getElementById('attDate').value;
+    // Only send statuses that have a value (skip unset students to avoid overwriting other batches)
+    const filteredStatus = {};
     const studentMap = {};
-    _allStudents.forEach(s => { studentMap[s.id] = {name:s.name,grade:s.grade,batch:s.batch}; });
+    Object.entries(currentStatus).forEach(([id, status]) => {
+      if (status) { // Only include students with P/A/L set
+        filteredStatus[id] = status;
+        const s = _allStudents.find(st => st.id === id);
+        if (s) studentMap[id] = {name:s.name,grade:s.grade,batch:s.batch};
+      }
+    });
     try {
-      await ZestSync.saveAttendanceToSheet(date, currentStatus, studentMap);
+      await ZestSync.saveAttendanceToSheet(date, filteredStatus, studentMap);
       const t = document.getElementById('saveToast');
       t.textContent = '✅ Attendance saved to Firebase!'; t.style.display = 'block';
       setTimeout(() => t.style.display = 'none', 2500);
