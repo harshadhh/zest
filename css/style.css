@@ -603,29 +603,31 @@ body.admin-body {
    Sidebar collapses to icons-only. Content expands.
    ============================================================ */
 @media (max-width: 1024px) {
-  .admin-sidebar { width: 60px; overflow: hidden; }
+  .admin-sidebar { width: 140px; overflow: hidden; }
 
-  /* Hide logo text and section labels */
-  .admin-sidebar .admin-logo > div:last-child,
+  /* Hide section labels, keep logo compact */
   .admin-sidebar .admin-nav-section { display: none; }
-  .admin-sidebar .admin-logo { padding: .75rem; justify-content: center; }
+  .admin-sidebar .admin-logo > div:last-child { display: none; }
+  .admin-sidebar .admin-logo { padding: .65rem; justify-content: center; }
 
-  /* Hide nav text (text nodes) by setting font-size to 0, keep icon visible */
+  /* Show icon + truncated label */
   .admin-nav-item {
-    justify-content: center;
-    padding: .65rem;
+    padding: .55rem .6rem;
     border-left: none !important;
-    font-size: 0;          /* hides the text node */
+    font-size: .7rem;
     white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
+    gap: .4rem;
   }
   .admin-nav-item .admin-nav-icon {
-    font-size: 1.25rem;   /* icons stay visible */
+    font-size: 1rem;
     margin: 0;
-    width: auto;
+    width: 20px;
+    flex-shrink: 0;
   }
 
-  .admin-main { margin-left: 60px; }
+  .admin-main { margin-left: 140px; }
 
   .admin-header { padding: 1rem 1.25rem; flex-wrap: wrap; }
   .admin-header-right { flex-wrap: wrap; }
@@ -669,7 +671,7 @@ body.admin-body {
   .admin-nav-item {
     justify-content: flex-start;
     padding: .65rem .85rem;
-    font-size: .88rem;     /* restore text from tablet's font-size:0 */
+    font-size: .88rem;     /* restore full text from tablet's truncated .7rem */
     overflow: visible;
     white-space: normal;
   }
