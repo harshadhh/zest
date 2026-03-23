@@ -362,10 +362,12 @@
 
   async function deleteFeeFromModal(feeId) {
     if(!confirm('Delete this payment record?')) return;
-    await ZestSync.deleteRow('fees','zest_fees','id',feeId);
-    fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
-    renderStudentFees();
-    if(currentStudent) openPayModal(currentStudent.id);
+    try {
+      await ZestSync.deleteRow('fees','zest_fees','id',feeId);
+      fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
+      renderStudentFees();
+      if(currentStudent) openPayModal(currentStudent.id);
+    } catch(e) { showModalMsg('❌ Delete failed: ' + e.message, 'err'); }
   }
 
   function editFeeRecord(feeId) {
@@ -401,7 +403,7 @@
     setTimeout(() => el.style.display='none', 3000);
   }
 
-  init();
+
 </script>
 </body>
 </html>
