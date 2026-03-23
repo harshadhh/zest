@@ -289,12 +289,29 @@
     const studentFees = fees.filter(f=>f.studentId===s.id||f.studentName===s.name).sort((a,b)=>new Date(b.date)-new Date(a.date));
     document.getElementById('payHistory').innerHTML = studentFees.length===0
       ? '<div style="color:rgba(255,255,255,.3);font-size:.83rem;">No payment records yet.</div>'
-      : studentFees.map(f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:.65rem .85rem;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:.4rem;">
+      : studentFees.map(f=>`<div id="feeView_${esc(f.id)}" style="display:flex;justify-content:space-between;align-items:center;padding:.65rem .85rem;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:.4rem;">
           <div><div style="font-size:.85rem;font-weight:600;">₹${parseFloat(f.amount||0).toLocaleString('en-IN')}</div>
           <div style="font-size:.72rem;color:rgba(255,255,255,.35);">${esc(f.date)||'—'} · ${esc(f.method)||'Cash'}</div></div>
           <div style="display:flex;align-items:center;gap:.5rem;">
             <span class="status-badge ${esc(f.status||'pending')}">${esc((f.status||'pending').charAt(0).toUpperCase()+(f.status||'pending').slice(1))}</span>
-            <button onclick="deleteFeeFromModal('${esc(f.id)}')" style="background:none;border:none;color:rgba(239,68,68,.5);cursor:pointer;font-size:.8rem;">✕</button>
+            <button onclick="editFeeRecord('${esc(f.id)}')" style="background:none;border:none;color:rgba(235,168,33,.6);cursor:pointer;font-size:.8rem;" title="Edit">✏️</button>
+            <button onclick="deleteFeeFromModal('${esc(f.id)}')" style="background:none;border:none;color:rgba(239,68,68,.5);cursor:pointer;font-size:.8rem;" title="Delete">✕</button>
+          </div>
+        </div>
+        <div id="feeEdit_${esc(f.id)}" style="display:none;background:rgba(255,255,255,.04);border-radius:8px;padding:.75rem;margin-bottom:.5rem;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem;">
+            <div><label style="font-size:.65rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Amount</label><input type="number" id="fedit_amount_${esc(f.id)}" value="${esc(f.amount||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.82rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+            <div><label style="font-size:.65rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Date</label><input type="date" id="fedit_date_${esc(f.id)}" value="${esc(f.date||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.82rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+            <div><label style="font-size:.65rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Status</label><select id="fedit_status_${esc(f.id)}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.82rem;font-family:'Outfit',sans-serif;">
+              <option value="paid" ${f.status==='paid'?'selected':''}>Paid</option><option value="pending" ${f.status==='pending'?'selected':''}>Pending</option><option value="partial" ${f.status==='partial'?'selected':''}>Partial</option><option value="overdue" ${f.status==='overdue'?'selected':''}>Overdue</option>
+            </select></div>
+            <div><label style="font-size:.65rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Method</label><select id="fedit_method_${esc(f.id)}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.82rem;font-family:'Outfit',sans-serif;">
+              ${['Cash','UPI','Card','Bank Transfer','Cheque','Other'].map(m=>'<option value="'+m+'" '+(f.method===m?'selected':'')+'>'+m+'</option>').join('')}
+            </select></div>
+          </div>
+          <div style="display:flex;gap:.5rem;">
+            <button onclick="saveFeeEdit('${esc(f.id)}')" style="background:linear-gradient(135deg,#EBA821,#C98A10);color:#0F1E3D;border:none;padding:.4rem .8rem;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">💾 Save</button>
+            <button onclick="document.getElementById('feeEdit_${esc(f.id)}').style.display='none';document.getElementById('feeView_${esc(f.id)}').style.display='flex';" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1);padding:.4rem .8rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">Cancel</button>
           </div>
         </div>`).join('');
     document.getElementById('payModal').classList.add('open');
@@ -349,6 +366,30 @@
     fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
     renderStudentFees();
     if(currentStudent) openPayModal(currentStudent.id);
+  }
+
+  function editFeeRecord(feeId) {
+    document.getElementById('feeView_' + feeId).style.display = 'none';
+    document.getElementById('feeEdit_' + feeId).style.display = 'block';
+  }
+
+  async function saveFeeEdit(feeId) {
+    try {
+      const updates = {
+        amount: document.getElementById('fedit_amount_' + feeId).value,
+        date:   document.getElementById('fedit_date_' + feeId).value,
+        status: document.getElementById('fedit_status_' + feeId).value,
+        method: document.getElementById('fedit_method_' + feeId).value,
+      };
+      if (!updates.amount || !updates.date) { alert('Amount and Date are required.'); return; }
+      await ZestSync.updateRow('fees', 'zest_fees', feeId, updates);
+      fees = (await ZestSync.getAll('fees', 'zest_fees')).map(normalizeFee);
+      renderStudentFees();
+      showModalMsg('✅ Fee record updated!', 'ok');
+      if (currentStudent) setTimeout(() => openPayModal(currentStudent.id), 600);
+    } catch(e) {
+      showModalMsg('❌ Error: ' + e.message, 'err');
+    }
   }
 
   function showModalMsg(msg, type) {
