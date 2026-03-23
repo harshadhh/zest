@@ -480,7 +480,7 @@
       try {
         const attUrl = localStorage.getItem('zest_att_sheets_url');
         if (attUrl) {
-          fetch(attUrl, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'clearAll',data:{}}) });
+          fetch(attUrl, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'clearAll',data:{}}) });
         }
       } catch(e) {}
     }
@@ -501,7 +501,7 @@
     try {
       const attUrl = localStorage.getItem('zest_att_sheets_url');
       if (attUrl) {
-        fetch(attUrl, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'clearAll',data:{}}) });
+        fetch(attUrl, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'clearAll',data:{}}) });
       }
     } catch(e) {}
     const keep = ['zest_pw_hash','zest_sheets_url','zest_att_sheets_url'];
