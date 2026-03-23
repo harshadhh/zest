@@ -271,13 +271,11 @@ window.ZestSync = (function () {
     try {
       const url = localStorage.getItem('zest_sheets_url');
       if (!url) return; // No script URL configured
-      const token = sessionStorage.getItem('zest_sheets_token') || '';
       const cleanData = _cleanForSheets(data);
       fetch(url, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action, token, data: cleanData }),
+        body: JSON.stringify({ action, data: cleanData }),
       }).catch(() => {}); // Silent — never block UI
     } catch (e) {}
   }
@@ -292,7 +290,6 @@ window.ZestSync = (function () {
       if (!url) return; // No attendance script URL configured
       fetch(url, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action, data }),
       }).catch(() => {}); // Silent — never block UI
