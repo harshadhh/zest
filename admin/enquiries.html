@@ -275,9 +275,11 @@
 
   async function deleteEnq(id) {
     if(!confirm('Delete this enquiry?')) return;
-    await ZestSync.deleteRow('enquiries','zest_enquiries','id',id);
-    enquiries = await ZestSync.getAll('enquiries','zest_enquiries');
-    renderEnquiries();
+    try {
+      await ZestSync.deleteRow('enquiries','zest_enquiries','id',id);
+      enquiries = await ZestSync.getAll('enquiries','zest_enquiries');
+      renderEnquiries();
+    } catch(e) { alert('Delete failed: ' + e.message); }
   }
 
   function renderEnquiries() {
@@ -320,10 +322,10 @@
           <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Phone</label><input type="text" id="eedit_phone_${esc(e.id)}" value="${esc(e.phone||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
           <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Email</label><input type="email" id="eedit_email_${esc(e.id)}" value="${esc(e.email||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
           <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Interest</label><select id="eedit_interest_${esc(e.id)}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;">
-            ${['Admission','Fee Enquiry','Course Info','General','Other'].map(o=>'<option value="'+o+'" '+(e.interest===o?'selected':'')+'>'+o+'</option>').join('')}
+            ${['','School Tuition','NDA Preparation','CDS Preparation','AFCAT','INET','Other'].map(o=>'<option value="'+o+'" '+(e.interest===o?'selected':'')+'>'+( o||'— Select —')+'</option>').join('')}
           </select></div>
           <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Source</label><select id="eedit_source_${esc(e.id)}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;">
-            ${['Walk-in','Phone Call','WhatsApp','Social Media','Website','Referral','Other'].map(o=>'<option value="'+o+'" '+(e.source===o?'selected':'')+'>'+o+'</option>').join('')}
+            ${['','Walk-in','Phone Call','Reference','Social Media','Other'].map(o=>'<option value="'+o+'" '+(e.source===o?'selected':'')+'>'+( o||'— Select —')+'</option>').join('')}
           </select></div>
         </div>
         <div style="display:flex;gap:.5rem;margin-top:.5rem;">
