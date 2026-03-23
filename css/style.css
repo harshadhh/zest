@@ -604,19 +604,34 @@ body.admin-body {
    ============================================================ */
 @media (max-width: 1024px) {
   .admin-sidebar { width: 60px; overflow: hidden; }
+
+  /* Hide logo text and section labels */
   .admin-sidebar .admin-logo > div:last-child,
-  .admin-sidebar .admin-nav-section,
-  .admin-nav-item span:not(.admin-nav-icon) { display: none; }
+  .admin-sidebar .admin-nav-section { display: none; }
   .admin-sidebar .admin-logo { padding: .75rem; justify-content: center; }
-  .admin-nav-item { justify-content: center; padding: .65rem; border-left: none !important; }
-  .admin-nav-item .admin-nav-icon { margin: 0; width: auto; font-size: 1.25rem; }
+
+  /* Hide nav text (text nodes) by setting font-size to 0, keep icon visible */
+  .admin-nav-item {
+    justify-content: center;
+    padding: .65rem;
+    border-left: none !important;
+    font-size: 0;          /* hides the text node */
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .admin-nav-item .admin-nav-icon {
+    font-size: 1.25rem;   /* icons stay visible */
+    margin: 0;
+    width: auto;
+  }
+
   .admin-main { margin-left: 60px; }
 
   .admin-header { padding: 1rem 1.25rem; flex-wrap: wrap; }
   .admin-header-right { flex-wrap: wrap; }
   .admin-content { padding: 1.25rem; }
 
-  /* Force stats grid to 2 columns even when inline style says repeat(3,1fr) or repeat(4,1fr) */
+  /* Force stats grid to 2 columns even when inline style says repeat(3,1fr) */
   .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: .75rem; }
   .admin-two-col { grid-template-columns: 1fr !important; }
   .admin-stat-value { font-size: 1.5rem; }
@@ -649,10 +664,15 @@ body.admin-body {
   }
   /* Restore sidebar labels when open */
   .admin-sidebar .admin-logo > div:last-child,
-  .admin-sidebar .admin-nav-section,
-  .admin-nav-item span:not(.admin-nav-icon) { display: revert; }
+  .admin-sidebar .admin-nav-section { display: revert; }
   .admin-sidebar .admin-logo { padding: 1.5rem; justify-content: flex-start; }
-  .admin-nav-item { justify-content: flex-start; padding: .65rem .85rem; }
+  .admin-nav-item {
+    justify-content: flex-start;
+    padding: .65rem .85rem;
+    font-size: .88rem;     /* restore text from tablet's font-size:0 */
+    overflow: visible;
+    white-space: normal;
+  }
 
   body.sidebar-open .admin-sidebar { transform: translateX(0); }
   body.sidebar-open .sidebar-overlay { display: block; }
