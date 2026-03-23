@@ -514,8 +514,8 @@
     const editGrid = fields.map(f => {
       let input = '';
       if (f.type === 'select') {
-        input = `<select id="edit_${f.key}" style="width:100%;padding:.4rem .55rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;color:white;font-family:'Outfit',sans-serif;font-size:.82rem;">
-          ${f.options.map(o => `<option value="${esc(o)}" ${(s[f.key]||'')===o?'selected':''}>${esc(o||'— Select —')}</option>`).join('')}
+        input = `<select id="edit_${f.key}" style="width:100%;padding:.4rem .55rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;color:white;font-family:'Outfit',sans-serif;font-size:.82rem;color-scheme:dark;">
+          ${f.options.map(o => `<option value="${esc(o)}" style="background:#0F1E3D;color:white;" ${(s[f.key]||'')===o?'selected':''}>${esc(o||'— Select —')}</option>`).join('')}
         </select>`;
       } else {
         input = `<input type="${f.type}" id="edit_${f.key}" value="${esc(s[f.key]||'')}"
