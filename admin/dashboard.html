@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — The Zest Admin</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    :root {
+      --gold: #EBA821;
+      --green: #10B981;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: .65rem;
+    }
+
+    .quick-grid a,
+    .quick-grid button {
+      text-decoration: none;
+      display: block;
+      text-align: center;
+      border-radius: 12px;
+      padding: .7rem 1rem;
+      font-family: 'Outfit', sans-serif;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+    }
+  </style>
+</head>
+
+<body class="admin-body">
+  <div class="admin-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="admin-sidebar">
+      <div class="admin-logo">
+        <div style="width:40px;height:40px;position:relative;flex-shrink:0;">
+          <img src="../images/zestlogo.jpg" alt="Logo"
+            style="width:40px;height:40px;object-fit:contain;border-radius:8px;"
+            onerror="this.style.display='none';this.parentElement.querySelector('.logo-fb').style.display='flex'" />
+          <div class="logo-fb" style="display:none;width:40px;height:40px;border-radius:10px;
+          background:linear-gradient(135deg,#EBA821,#C98A10);align-items:center;justify-content:center;
+          font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:900;color:#0F1E3D;">Z</div>
+        </div>
+        <div>
+          <div
+            style="color:white;font-family:'Playfair Display',serif;font-size:.95rem;font-weight:700;letter-spacing:.08em;">
+            THE ZEST</div>
+          <div class="admin-logo-text">Command Center</div>
+        </div>
+      </div>
+      <nav class="admin-nav">
+        <div class="admin-nav-section">Main</div>
+        <a href="dashboard.html" class="admin-nav-item active"><span class="admin-nav-icon">📊</span> Dashboard</a>
+        <a href="attendance.html" class="admin-nav-item"><span class="admin-nav-icon">✅</span> Attendance</a>
+        <a href="fees.html" class="admin-nav-item"><span class="admin-nav-icon">💰</span> Fee Records</a>
+        <a href="students.html" class="admin-nav-item"><span class="admin-nav-icon">🎓</span> Student Logs</a>
+        <div class="admin-nav-section">Academic</div>
+        <a href="results.html" class="admin-nav-item"><span class="admin-nav-icon">📝</span> Results &amp; Marks</a>
+        <a href="enquiries.html" class="admin-nav-item"><span class="admin-nav-icon">📩</span> Enquiries</a>
+        <div class="admin-nav-section">Settings</div>
+        <a href="settings.html" class="admin-nav-item"><span class="admin-nav-icon">⚙️</span> Settings</a>
+        <a href="index.html" class="admin-nav-item" onclick="event.preventDefault();ZestSync.logout()"><span
+            class="admin-nav-icon">🚪</span> Logout</a>
+      </nav>
+    </aside>
+    <div class="sidebar-overlay" onclick="document.body.classList.remove('sidebar-open')"></div>
+
+    <!-- MAIN -->
+    <main class="admin-main">
+      <header class="admin-header">
+        <div style="display:flex;align-items:center;gap:.75rem;">
+          <button class="mobile-menu-btn" onclick="document.body.classList.toggle('sidebar-open')">☰</button>
+          <div>
+            <div class="admin-page-title">Dashboard</div>
+            <div style="font-size:.75rem;color:rgba(255,255,255,.35);margin-top:.15rem;" id="currentDate"></div>
+          </div>
+        </div>
+        <div class="admin-header-right">
+          <span
+            style="background:rgba(16,185,129,.12);color:#6EE7B7;border:1px solid rgba(16,185,129,.25);padding:.25rem .8rem;border-radius:50px;font-size:.72rem;font-weight:700;">⚡
+            System Online</span>
+          <span id="syncStatusBadge">⏳ Connecting...</span>
+        </div>
+      </header>
+
+      <div class="admin-content">
+
+        <!-- Stats -->
+        <div class="admin-stats-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon">🎓</div>
+            <div class="admin-stat-value" id="totalStudents">—</div>
+            <div class="admin-stat-label">Total Students</div>
+            <div class="admin-stat-change neutral" id="studentsChange">Loading...</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon">✅</div>
+            <div class="admin-stat-value" id="attendancePct">—</div>
+            <div class="admin-stat-label">Today's Attendance</div>
+            <div class="admin-stat-change neutral" id="attendanceDetail">Loading...</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-icon">⏳</div>
+            <div class="admin-stat-value" id="feeCollected">—</div>
+            <div class="admin-stat-label">Fees Pending</div>
+            <div class="admin-stat-change neutral" id="feePending">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Two-column -->
+        <div class="admin-two-col">
+
+          <!-- Recent Students -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-title">Recent Registrations</div>
+                <div class="admin-card-subtitle">Last 5 students added</div>
+              </div>
+              <a href="students.html"
+                style="font-size:.8rem;color:var(--gold);text-decoration:none;font-weight:600;">View All →</a>
+            </div>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Grade</th>
+                  <th>Batch</th>
+                  <th>Fees</th>
+                </tr>
+              </thead>
+              <tbody id="recentStudentsBody">
+                <tr>
+                  <td colspan="4" style="color:rgba(255,255,255,.3);text-align:center;padding:2rem;">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-title">Quick Actions</div>
+                <div class="admin-card-subtitle">Jump to key tasks</div>
+              </div>
+            </div>
+            <div class="quick-grid">
+              <a href="attendance.html" class="btn-admin-primary" style="text-align:center;">✅ Mark Today's
+                Attendance</a>
+              <a href="students.html" class="btn-admin-secondary">🎓 Add New Student</a>
+              <a href="fees.html" class="btn-admin-secondary">💰 Record Fee Payment</a>
+              <a href="results.html" class="btn-admin-secondary">📝 Add Test Result</a>
+              <a href="enquiries.html" class="btn-admin-secondary">📩 Log Enquiry</a>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Fee Overview -->
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <div>
+              <div class="admin-card-title">Fee Status Overview</div>
+              <div class="admin-card-subtitle" id="currentMonth">Loading...</div>
+            </div>
+            <a href="fees.html" style="font-size:.8rem;color:var(--gold);text-decoration:none;font-weight:600;">Manage
+              Fees →</a>
+          </div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Grade</th>
+                <th>Amount</th>
+                <th>Due Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="feeOverviewBody">
+              <tr>
+                <td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:2rem;">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div><!-- /admin-content -->
+    </main>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script src="zest-sync.js"></script>
+  <script>
+    ZestSync.guardPage(() => {
+      ZestSync.initSyncBadge();
+      const _safeGet = k => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };
+      renderDashboard(_safeGet('zest_students'), _safeGet('zest_fees'), {});
+      Promise.all([
+        ZestSync.getAll('students', 'zest_students'),
+        ZestSync.getAll('fees', 'zest_fees'),
+        ZestSync.getAttendance(new Date().toISOString().split('T')[0]),
+      ]).then(([students, fees, todayAtt]) => {
+        renderDashboard(students, fees, todayAtt);
+      }).catch(() => { });
+    });
+
+    function renderDashboard(students, rawFees, todayAttData) {
+      const esc = ZestSync.escapeHtml;
+      const now = new Date();
+      document.getElementById('currentDate').textContent = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      document.getElementById('currentMonth').textContent = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      const fees = rawFees.map(f => ({
+        ...f,
+        status: (f.status && f.status !== 'undefined') ? f.status : 'pending',
+        date: (f.date || '').split('T')[0],
+      }));
+
+      // Students stat
+      document.getElementById('totalStudents').textContent = students.length;
+      document.getElementById('studentsChange').textContent = students.length + ' registered';
+
+      // Attendance stat — use fetched data directly (not localStorage)
+      const todayAtt = todayAttData || {};
+      const presentCount = Object.values(todayAtt).filter(v => v === 'present').length;
+      const pct = students.length ? Math.round((presentCount / students.length) * 100) : 0;
+      document.getElementById('attendancePct').textContent = students.length ? pct + '%' : '—';
+      document.getElementById('attendanceDetail').textContent = students.length
+        ? `${presentCount} / ${students.length} present today` : 'No students added';
+
+      // Fees pending stat
+      const allPending = fees.filter(f => ['pending', 'partial', 'overdue'].includes((f.status || 'pending').toLowerCase()));
+      const totalPendingAmt = allPending.reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+      const paidCount = fees.filter(f => (f.status || '').toLowerCase() === 'paid').length;
+      document.getElementById('feeCollected').textContent = '₹' + totalPendingAmt.toLocaleString('en-IN');
+      document.getElementById('feePending').textContent = allPending.length + ' unpaid · ' + paidCount + ' paid';
+
+      // Recent students table
+      const tbody = document.getElementById('recentStudentsBody');
+      tbody.innerHTML = students.length === 0
+        ? '<tr><td colspan="4" style="color:rgba(255,255,255,.3);text-align:center;padding:2rem;">No students yet. <a href="students.html" style="color:var(--gold);">Add first →</a></td></tr>'
+        : [...students].reverse().slice(0, 5).map(s => `<tr>
+          <td><div style="font-weight:600;">${esc(s.name)}</div><div style="font-size:.75rem;color:rgba(255,255,255,.35);">${esc(s.phone)}</div></td>
+          <td>${esc(s.grade) || '—'}</td>
+          <td>${esc(s.batch) || '—'}</td>
+          <td><span class="status-badge ${esc((s.feeStatus || 'pending').toLowerCase())}">${esc(s.feeStatus) || 'Pending'}</span></td>
+        </tr>`).join('');
+
+      // Fee overview table (current month only)
+      const feeTbody = document.getElementById('feeOverviewBody');
+      const curFees = fees.filter(f => {
+        const d = new Date((f.date || '') + 'T00:00:00');
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      });
+      feeTbody.innerHTML = curFees.length === 0
+        ? '<tr><td colspan="5" style="color:rgba(255,255,255,.3);text-align:center;padding:2rem;">No fee records this month. <a href="fees.html" style="color:var(--gold);">Add →</a></td></tr>'
+        : [...curFees].reverse().map(f => {
+          const st = (f.status || 'pending').toLowerCase();
+          const dateStr = f.date ? new Date(f.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
+          return `<tr>
+            <td>${esc(f.studentName) || '—'}</td>
+            <td>${esc(f.grade) || '—'}</td>
+            <td style="font-weight:600;color:#6EE7B7;">₹${parseFloat(f.amount || 0).toLocaleString('en-IN')}</td>
+            <td>${dateStr}</td>
+            <td><span class="status-badge ${esc(st)}">${esc(st.charAt(0).toUpperCase() + st.slice(1))}</span></td>
+          </tr>`;
+        }).join('');
+    }
+
+  </script>
+</body>
+
+</html>

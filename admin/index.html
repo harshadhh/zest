@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>The Zest Admin — Login</title>
+  <meta name="robots" content="noindex, nofollow"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0a1220 0%, #1B365D 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle background texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 40%, rgba(235,168,33,.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 70%, rgba(27,54,93,.8) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* ---- Login Card ---- */
+    .login-card {
+      background: #0F1E3D;
+      border: 1px solid rgba(235,168,33,.2);
+      border-radius: 24px;
+      max-width: 420px;
+      width: 100%;
+      padding: 3rem 2.5rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.04);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---- Shake animation ---- */
+    @keyframes shake {
+      0%  { transform: translateX(0); }
+      15% { transform: translateX(-8px); }
+      30% { transform: translateX(8px); }
+      45% { transform: translateX(-6px); }
+      60% { transform: translateX(6px); }
+      75% { transform: translateX(-3px); }
+      90% { transform: translateX(3px); }
+      100%{ transform: translateX(0); }
+    }
+
+    .login-card.shake {
+      animation: shake .5s ease;
+    }
+
+    /* ---- Spinner ---- */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #spinner {
+      width: 16px;
+      height: 16px;
+      border: 2.5px solid rgba(15,30,61,.4);
+      border-top-color: #0F1E3D;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+      flex-shrink: 0;
+    }
+
+    /* ---- Logo ---- */
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .logo-icon {
+      width: 52px;
+      height: 52px;
+      background: #EBA821;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Playfair Display', serif;
+      font-weight: 900;
+      font-size: 1.7rem;
+      color: #0F1E3D;
+      flex-shrink: 0;
+      letter-spacing: -.03em;
+      box-shadow: 0 4px 16px rgba(235,168,33,.3);
+    }
+
+    .logo-text-block { display: flex; flex-direction: column; }
+
+    .logo-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: white;
+      line-height: 1.1;
+    }
+
+    .logo-sub {
+      font-size: .72rem;
+      color: #EBA821;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-top: .2rem;
+      font-weight: 500;
+    }
+
+    /* ---- Divider ---- */
+    .login-divider {
+      width: 100%;
+      height: 1px;
+      background: rgba(255,255,255,.07);
+      margin-bottom: 2rem;
+    }
+
+    /* ---- Heading ---- */
+    .login-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: .35rem;
+    }
+
+    .login-subtitle {
+      font-size: .85rem;
+      color: rgba(255,255,255,.4);
+      margin-bottom: 1.75rem;
+      font-weight: 400;
+    }
+
+    /* ---- Error box ---- */
+    #errorBox {
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      color: #FCA5A5;
+      padding: .75rem 1rem;
+      border-radius: 10px;
+      font-size: .85rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+
+    /* ---- Label ---- */
+    .form-label {
+      font-size: .8rem;
+      font-weight: 600;
+      color: rgba(255,255,255,.55);
+      display: block;
+      margin-bottom: .45rem;
+    }
+
+    /* ---- Password input wrapper ---- */
+    .pass-wrapper {
+      position: relative;
+      margin-bottom: 1.5rem;
+    }
+
+    #passInput {
+      width: 100%;
+      padding: .9rem 3rem .9rem 1.1rem;
+      background: rgba(255,255,255,.05);
+      border: 1.5px solid rgba(255,255,255,.12);
+      border-radius: 12px;
+      font-family: 'Outfit', sans-serif;
+      font-size: .95rem;
+      color: white;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      letter-spacing: .04em;
+    }
+
+    #passInput:focus {
+      border-color: #EBA821;
+      box-shadow: 0 0 0 3px rgba(235,168,33,.12);
+    }
+
+    #passInput::placeholder {
+      color: rgba(255,255,255,.25);
+      letter-spacing: 0;
+    }
+
+    .eye-btn {
+      position: absolute;
+      right: .9rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.35);
+      cursor: pointer;
+      font-size: 1.05rem;
+      line-height: 1;
+      padding: .2rem;
+      transition: color .2s;
+    }
+
+    .eye-btn:hover { color: rgba(255,255,255,.7); }
+
+    /* ---- Submit button ---- */
+    #loginBtn {
+      width: 100%;
+      padding: .9rem 1.5rem;
+      background: linear-gradient(135deg, #EBA821, #C98A10);
+      color: #0F1E3D;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: .95rem;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .6rem;
+    }
+
+    #loginBtn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px rgba(235,168,33,.45);
+    }
+
+    #loginBtn:disabled {
+      opacity: .65;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* ---- Sync status ---- */
+    .sync-row {
+      margin-top: 1.75rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid rgba(255,255,255,.07);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+    }
+
+    #syncStatus {
+      font-size: .76rem;
+      font-weight: 600;
+    }
+
+    .sync-status.live  { color: rgba(251,146,60,.9); }
+    .sync-status.local { color: rgba(239,68,68,.8); }
+
+    /* ---- Footer note ---- */
+    .login-footer {
+      text-align: center;
+      font-size: .7rem;
+      color: rgba(255,255,255,.18);
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-card" id="loginCard">
+
+  <!-- Logo -->
+  <div class="logo-row">
+    <div class="logo-icon">Z</div>
+    <div class="logo-text-block">
+      <span class="logo-name">THE ZEST</span>
+      <span class="logo-sub">Admin Portal</span>
+    </div>
+  </div>
+
+  <div class="login-divider"></div>
+
+  <!-- Heading -->
+  <div class="login-title">Admin Access</div>
+  <div class="login-subtitle">Authorized personnel only</div>
+
+  <!-- Error box -->
+  <div id="errorBox"></div>
+
+  <!-- Password field -->
+  <label class="form-label" for="passInput">Password</label>
+  <div class="pass-wrapper">
+    <input
+      type="password"
+      id="passInput"
+      placeholder="Enter your password"
+      onkeydown="if(event.key==='Enter') login()"
+      autocomplete="current-password"
+    />
+    <button class="eye-btn" type="button" onclick="toggleEye()" tabindex="-1" aria-label="Toggle password visibility">👁</button>
+  </div>
+
+  <!-- Submit -->
+  <button id="loginBtn" onclick="login()">
+    <div id="spinner"></div>
+    <span id="btnText">Access Dashboard →</span>
+  </button>
+
+  <!-- Sync status -->
+  <div class="sync-row">
+    <span id="syncStatus" class="sync-status">⏳ Connecting...</span>
+  </div>
+
+  <!-- Footer -->
+  <div class="login-footer">The Zest Classes · Dighi, Pune</div>
+
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="zest-sync.js"></script>
+<script>
+  // Single initFirebase call — handles both auth check and status display
+  const syncEl = document.getElementById('syncStatus');
+  syncEl.textContent = '🔥 Connecting...';
+
+  ZestSync.initFirebase().then(ok => {
+    // If already logged in, skip login page
+    if (sessionStorage.getItem('zest_admin_auth') === 'true') {
+      window.location.href = 'dashboard.html'; return;
+    }
+    syncEl.textContent = ok ? '🔥 Firebase ready' : '🔴 Could not connect — check internet';
+    syncEl.className = 'sync-status ' + (ok ? 'live' : 'local');
+  });
+
+  function toggleEye() {
+    const inp = document.getElementById('passInput');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  }
+
+  let _loggingIn = false;
+
+  async function login() {
+    if (_loggingIn) return;
+    const passEl   = document.getElementById('passInput');
+    const errorEl  = document.getElementById('errorBox');
+    const btn      = document.getElementById('loginBtn');
+    const btnText  = document.getElementById('btnText');
+    const spinner  = document.getElementById('spinner');
+    const card     = document.getElementById('loginCard');
+
+    const pass = passEl.value.trim();
+    if (!pass) {
+      passEl.style.borderColor = '#EF4444';
+      setTimeout(() => passEl.style.borderColor = '', 2000);
+      return;
+    }
+
+    _loggingIn = true;
+    btn.disabled = true;
+    btnText.textContent = 'Signing in...';
+    spinner.style.display = 'block';
+    errorEl.style.display = 'none';
+
+    try {
+      const ok = await ZestSync.verifyPassword(pass);
+      if (ok) { window.location.href = 'dashboard.html'; return; }
+      passEl.value = '';
+      passEl.focus();
+      errorEl.textContent = '❌ Incorrect password';
+      errorEl.style.display = 'block';
+      card.classList.remove('shake');
+      void card.offsetWidth;
+      card.classList.add('shake');
+    } catch (err) {
+      passEl.value = '';
+      errorEl.textContent = '❌ ' + (err.message || 'Login failed. Try again.');
+      errorEl.style.display = 'block';
+      card.classList.remove('shake');
+      void card.offsetWidth;
+      card.classList.add('shake');
+    }
+
+    _loggingIn = false;
+    btn.disabled = false;
+    btnText.textContent = 'Access Dashboard →';
+    spinner.style.display = 'none';
+  }
+</script>
+</body>
+</html>

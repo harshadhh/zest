@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Results & Marks — The Zest Admin</title>
+  <meta name="robots" content="noindex, nofollow"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    :root{--gold:#EBA821;--green:#10B981;}
+    .sel-styled{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23EBA821' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .9rem center;}
+    .grade-A{background:rgba(16,185,129,.15);color:#6EE7B7;}
+    .grade-B{background:rgba(235,168,33,.12);color:#EBA821;}
+    .grade-C{background:rgba(59,130,246,.12);color:#93C5FD;}
+    .grade-D{background:rgba(239,68,68,.12);color:#FCA5A5;}
+    input[type="date"]{color-scheme:dark;}
+  </style>
+</head>
+<body class="admin-body">
+<div class="admin-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="admin-sidebar">
+    <div class="admin-logo">
+      <div style="width:40px;height:40px;position:relative;flex-shrink:0;">
+        <img src="../images/zestlogo.jpg" alt="Logo" style="width:40px;height:40px;object-fit:contain;border-radius:8px;"
+          onerror="this.style.display='none';this.parentElement.querySelector('.logo-fb').style.display='flex'"/>
+        <div class="logo-fb" style="display:none;width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#EBA821,#C98A10);align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:900;color:#0F1E3D;">Z</div>
+      </div>
+      <div>
+        <div style="color:white;font-family:'Playfair Display',serif;font-size:.95rem;font-weight:700;letter-spacing:.08em;">THE ZEST</div>
+        <div class="admin-logo-text">Command Center</div>
+      </div>
+    </div>
+    <nav class="admin-nav">
+      <div class="admin-nav-section">Main</div>
+      <a href="dashboard.html" class="admin-nav-item"><span class="admin-nav-icon">📊</span> Dashboard</a>
+      <a href="attendance.html" class="admin-nav-item"><span class="admin-nav-icon">✅</span> Attendance</a>
+      <a href="fees.html" class="admin-nav-item"><span class="admin-nav-icon">💰</span> Fee Records</a>
+      <a href="students.html" class="admin-nav-item"><span class="admin-nav-icon">🎓</span> Student Logs</a>
+      <div class="admin-nav-section">Academic</div>
+      <a href="results.html" class="admin-nav-item active"><span class="admin-nav-icon">📝</span> Results &amp; Marks</a>
+      <a href="enquiries.html" class="admin-nav-item"><span class="admin-nav-icon">📩</span> Enquiries</a>
+      <div class="admin-nav-section">Settings</div>
+      <a href="settings.html" class="admin-nav-item"><span class="admin-nav-icon">⚙️</span> Settings</a>
+      <a href="index.html" class="admin-nav-item" onclick="event.preventDefault();ZestSync.logout()"><span class="admin-nav-icon">🚪</span> Logout</a>
+    </nav>
+  </aside>
+  <div class="sidebar-overlay" onclick="document.body.classList.remove('sidebar-open')"></div>
+
+  <!-- MAIN -->
+  <main class="admin-main">
+    <header class="admin-header">
+      <div style="display:flex;align-items:center;gap:.75rem;">
+        <button class="mobile-menu-btn" onclick="document.body.classList.toggle('sidebar-open')">☰</button>
+        <div class="admin-page-title">Results &amp; Marks</div>
+      </div>
+      <div class="admin-header-right">
+        <button class="btn-admin-secondary" onclick="exportResultsCSV()" style="padding:.5rem 1rem;font-size:.82rem;">📥 Export CSV</button>
+        <button class="btn-admin-primary" onclick="toggleResultForm()" style="padding:.5rem 1rem;font-size:.82rem;">+ Add Result</button>
+        <span id="syncStatusBadge">⏳ Connecting...</span>
+      </div>
+    </header>
+
+    <div class="admin-content">
+
+      <!-- Add Result Form -->
+      <div class="admin-card" id="addResultForm" style="display:none;">
+        <div class="admin-card-header">
+          <div class="admin-card-title">Add Test Result</div>
+          <button onclick="toggleResultForm()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:1.2rem;">✕</button>
+        </div>
+        <div class="admin-form">
+          <div class="admin-form-row">
+            <div class="form-group">
+              <label>Student *</label>
+              <select id="rStudent" class="sel-styled">
+                <option value="">Select Student</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Test Name *</label>
+              <input type="text" id="rTest" placeholder="e.g. Unit Test 1 / Mock NDA"/>
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div class="form-group">
+              <label>Subject *</label>
+              <select id="rSubject" class="sel-styled">
+                <option value="">Select Subject</option>
+                <option>Mathematics</option>
+                <option>Science</option>
+                <option>English</option>
+                <option>Social Science</option>
+                <option>Hindi / Marathi</option>
+                <option>General Ability (GAT)</option>
+                <option>General Knowledge</option>
+                <option>Logical Reasoning</option>
+                <option>Overall / Full Test</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Test Date</label>
+              <input type="date" id="rDate"/>
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div class="form-group">
+              <label>Marks Obtained *</label>
+              <input type="number" id="rMarks" placeholder="e.g. 78"/>
+            </div>
+            <div class="form-group">
+              <label>Total Marks *</label>
+              <input type="number" id="rTotal" placeholder="e.g. 100"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Remarks</label>
+            <input type="text" id="rRemarks" placeholder="Optional remarks / notes"/>
+          </div>
+          <div id="resultMsg"></div>
+          <div style="display:flex;gap:.75rem;margin-top:.5rem;">
+            <button class="btn-admin-primary" onclick="addResult()">✅ Save Result</button>
+            <button class="btn-admin-secondary" onclick="toggleResultForm()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="admin-toolbar">
+        <input class="admin-search" id="searchResults" placeholder="🔍 Search student or test..." oninput="renderResults()"/>
+        <select id="subjectFilter" class="sel-styled" onchange="renderResults()"
+          style="padding:.65rem 2.2rem .65rem .9rem;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:10px;color:white;font-family:'Outfit',sans-serif;font-size:.88rem;outline:none;">
+          <option value="all">All Subjects</option>
+          <option>Mathematics</option><option>Science</option><option>English</option>
+          <option>Social Science</option><option>Hindi / Marathi</option>
+          <option>General Ability (GAT)</option><option>General Knowledge</option>
+          <option>Logical Reasoning</option><option>Overall / Full Test</option>
+        </select>
+      </div>
+
+      <!-- Results Table -->
+      <div class="admin-card" style="padding:0;overflow:hidden;">
+        <div style="overflow-x:auto;">
+          <table class="admin-table">
+            <thead><tr>
+              <th>Student</th><th>Test</th><th>Subject</th><th>Score</th><th>Percentage</th><th>Grade</th><th>Date</th><th>Action</th>
+            </tr></thead>
+            <tbody id="resultsBody">
+              <tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">Loading results...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="zest-sync.js"></script>
+<script>
+  const esc = ZestSync.escapeHtml;
+
+  ZestSync.guardPage(() => {
+    ZestSync.initSyncBadge();
+    init();
+  });
+
+  let results = [], students = [];
+
+  function toggleResultForm() {
+    const f = document.getElementById('addResultForm');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  }
+
+  async function init() {
+    [students, results] = await Promise.all([
+      ZestSync.getAll('students','zest_students'),
+      ZestSync.getAll('results','zest_results'),
+    ]);
+    const sel = document.getElementById('rStudent');
+    sel.innerHTML = '<option value="">Select Student</option>';
+    students.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.name + ' · ' + (s.grade||'N/A');
+      sel.appendChild(o);
+    });
+    document.getElementById('rDate').value = new Date().toISOString().split('T')[0];
+    renderResults();
+  }
+
+  function gradeFromPct(pct) {
+    if(pct>=85) return {g:'A+',cls:'grade-A'};
+    if(pct>=70) return {g:'A', cls:'grade-A'};
+    if(pct>=55) return {g:'B', cls:'grade-B'};
+    if(pct>=40) return {g:'C', cls:'grade-C'};
+    return {g:'D', cls:'grade-D'};
+  }
+
+  let _resultSaving = false;
+  async function addResult() {
+    if(_resultSaving) return;
+    const studentId = document.getElementById('rStudent').value;
+    const test      = document.getElementById('rTest').value.trim();
+    const subject   = document.getElementById('rSubject').value;
+    const marks     = parseFloat(document.getElementById('rMarks').value);
+    const total     = parseFloat(document.getElementById('rTotal').value);
+    const date      = document.getElementById('rDate').value;
+    const remarks   = document.getElementById('rRemarks').value.trim();
+    const msgEl     = document.getElementById('resultMsg');
+
+    if(!studentId||!test||!subject||isNaN(marks)||isNaN(total)) {
+      msgEl.textContent = '⚠️ Please fill Student, Test Name, Subject, Marks and Total.';
+      msgEl.style.cssText = 'display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;';
+      return;
+    }
+    if(marks > total) {
+      msgEl.textContent = '⚠️ Marks cannot exceed Total marks.';
+      msgEl.style.cssText = 'display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;';
+      return;
+    }
+
+    const saveBtn = document.querySelector('#addResultForm .btn-admin-primary');
+    _resultSaving = true; if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='⏳ Saving...';}
+
+    try {
+      const student = students.find(s => s.id===studentId);
+      const pct = Math.round((marks/total)*100);
+      const result = {id:'R'+Date.now(),studentId,studentName:student?student.name:'',grade:student?student.grade:'',test,subject,marks,total,pct,date,remarks};
+      await ZestSync.appendRow('results','zest_results',result);
+      results = await ZestSync.getAll('results','zest_results');
+      ['rTest','rMarks','rTotal','rRemarks'].forEach(id => document.getElementById(id).value='');
+      msgEl.textContent = '✅ Result saved!';
+      msgEl.style.cssText = 'display:block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green);padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;';
+      setTimeout(() => msgEl.style.display='none', 2500);
+      renderResults();
+    } catch(e) {
+      msgEl.textContent = '❌ Error: '+e.message;
+      msgEl.style.cssText = 'display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;';
+    }
+    _resultSaving = false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='✅ Save Result';}
+  }
+
+  async function deleteResult(id) {
+    if(!confirm('Delete this result?')) return;
+    await ZestSync.deleteRow('results','zest_results','id',id);
+    results = await ZestSync.getAll('results','zest_results');
+    renderResults();
+  }
+
+  function renderResults() {
+    const search = (document.getElementById('searchResults').value||'').toLowerCase();
+    const subF   = document.getElementById('subjectFilter').value;
+    const filtered = results.filter(r => {
+      const ms = !search||(r.studentName||'').toLowerCase().includes(search)||(r.test||'').toLowerCase().includes(search);
+      const mj = subF==='all'||r.subject===subF;
+      return ms && mj;
+    });
+    const tbody = document.getElementById('resultsBody');
+    if(!filtered.length) { tbody.innerHTML='<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No results found.</td></tr>'; return; }
+    tbody.innerHTML = [...filtered].reverse().map(r => {
+      const {g, cls} = gradeFromPct(r.pct);
+      const barColor = r.pct>=70?'#10B981':r.pct>=40?'#EBA821':'#EF4444';
+      return `<tr>
+        <td><div style="font-weight:600;">${esc(r.studentName)}</div><div style="font-size:.75rem;color:rgba(255,255,255,.4);">${esc(r.grade)}</div></td>
+        <td style="font-weight:600;color:#fff;">${esc(r.test)}</td>
+        <td style="font-size:.83rem;">${esc(r.subject)}</td>
+        <td style="font-weight:700;color:var(--gold);">${r.marks} / ${r.total}</td>
+        <td><div style="display:flex;align-items:center;gap:.6rem;">
+          <div style="background:rgba(255,255,255,.06);border-radius:50px;height:8px;width:100px;overflow:hidden;">
+            <div style="width:${r.pct}%;height:100%;background:${barColor};border-radius:50px;"></div></div>
+          <span style="font-size:.82rem;font-weight:600;">${r.pct}%</span></div></td>
+        <td><span class="status-badge ${esc(cls)}" style="font-size:.75rem;">${esc(g)}</span></td>
+        <td style="font-size:.82rem;">${esc(r.date)||'—'}</td>
+        <td><button onclick="deleteResult('${esc(r.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.2);padding:.3rem .7rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">Delete</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function exportResultsCSV() {
+    if(!results.length) return;
+    const hdrs = ['Student','Grade','Test','Subject','Marks','Total','Percentage','Grade Badge','Date','Remarks'];
+    const rows = results.map(r => [r.studentName,r.grade,r.test,r.subject,r.marks,r.total,r.pct+'%',gradeFromPct(r.pct).g,r.date,r.remarks]);
+    const csv = [hdrs,...rows].map(r => r.map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download = `zest-results-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+  }
+
+</script>
+</body>
+</html>

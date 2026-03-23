@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fee Records — The Zest Admin</title>
+  <meta name="robots" content="noindex, nofollow"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <style>
+    :root{--gold:#EBA821;--green:#10B981;}
+    .sel-styled{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23EBA821' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .9rem center;}
+    .pay-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto;}
+    .pay-modal.open{display:flex;}
+    .pay-body{background:#0F1E3D;border:1px solid rgba(255,255,255,.1);border-radius:20px;width:100%;max-width:560px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,.5);margin:auto;}
+    input[type="date"]{color-scheme:dark;}
+  </style>
+</head>
+<body class="admin-body">
+<div class="admin-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="admin-sidebar">
+    <div class="admin-logo">
+      <div style="width:40px;height:40px;position:relative;flex-shrink:0;">
+        <img src="../images/zestlogo.jpg" alt="Logo" style="width:40px;height:40px;object-fit:contain;border-radius:8px;"
+          onerror="this.style.display='none';this.parentElement.querySelector('.logo-fb').style.display='flex'"/>
+        <div class="logo-fb" style="display:none;width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#EBA821,#C98A10);align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:900;color:#0F1E3D;">Z</div>
+      </div>
+      <div>
+        <div style="color:white;font-family:'Playfair Display',serif;font-size:.95rem;font-weight:700;letter-spacing:.08em;">THE ZEST</div>
+        <div class="admin-logo-text">Command Center</div>
+      </div>
+    </div>
+    <nav class="admin-nav">
+      <div class="admin-nav-section">Main</div>
+      <a href="dashboard.html" class="admin-nav-item"><span class="admin-nav-icon">📊</span> Dashboard</a>
+      <a href="attendance.html" class="admin-nav-item"><span class="admin-nav-icon">✅</span> Attendance</a>
+      <a href="fees.html" class="admin-nav-item active"><span class="admin-nav-icon">💰</span> Fee Records</a>
+      <a href="students.html" class="admin-nav-item"><span class="admin-nav-icon">🎓</span> Student Logs</a>
+      <div class="admin-nav-section">Academic</div>
+      <a href="results.html" class="admin-nav-item"><span class="admin-nav-icon">📝</span> Results &amp; Marks</a>
+      <a href="enquiries.html" class="admin-nav-item"><span class="admin-nav-icon">📩</span> Enquiries</a>
+      <div class="admin-nav-section">Settings</div>
+      <a href="settings.html" class="admin-nav-item"><span class="admin-nav-icon">⚙️</span> Settings</a>
+      <a href="index.html" class="admin-nav-item" onclick="event.preventDefault();ZestSync.logout()"><span class="admin-nav-icon">🚪</span> Logout</a>
+    </nav>
+  </aside>
+  <div class="sidebar-overlay" onclick="document.body.classList.remove('sidebar-open')"></div>
+
+  <!-- MAIN -->
+  <main class="admin-main">
+    <header class="admin-header">
+      <div style="display:flex;align-items:center;gap:.75rem;">
+        <button class="mobile-menu-btn" onclick="document.body.classList.toggle('sidebar-open')">☰</button>
+        <div class="admin-page-title">Fee Records</div>
+      </div>
+      <div class="admin-header-right">
+        <span id="syncStatusBadge">⏳ Connecting...</span>
+      </div>
+    </header>
+
+    <div class="admin-content">
+
+      <!-- Stats -->
+      <div class="admin-stats-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="admin-stat-card">
+          <div class="admin-stat-icon">✅</div>
+          <div class="admin-stat-value" id="totalCollected">₹0</div>
+          <div class="admin-stat-label">Total Collected</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-icon">⏳</div>
+          <div class="admin-stat-value" id="totalPending">₹0</div>
+          <div class="admin-stat-label">Total Pending</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-icon">🔴</div>
+          <div class="admin-stat-value" id="totalOverdue">0</div>
+          <div class="admin-stat-label">Overdue Students</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="admin-toolbar">
+        <input class="admin-search" id="searchInput" placeholder="🔍 Search student..." oninput="renderStudentFees()"/>
+        <select id="gradeFilter" class="sel-styled" onchange="renderStudentFees()"
+          style="padding:.65rem 2.2rem .65rem .9rem;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:10px;color:white;font-family:'Outfit',sans-serif;font-size:.88rem;outline:none;">
+          <option value="all">All Grades</option>
+          <option>8th Standard</option><option>9th Standard</option><option>10th Standard</option>
+          <option>11th Standard (Science)</option><option>11th Standard (Commerce)</option>
+          <option>12th Standard (Science)</option><option>12th Standard (Commerce)</option>
+          <option>NDA Aspirant</option><option>CDS Aspirant</option><option>AFCAT Aspirant</option><option>INET Aspirant</option>
+        </select>
+        <select id="batchFilter" class="sel-styled" onchange="renderStudentFees()"
+          style="padding:.65rem 2.2rem .65rem .9rem;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:10px;color:white;font-family:'Outfit',sans-serif;font-size:.88rem;outline:none;">
+          <option value="all">All Batches</option>
+          <option>5 AM Morning Batch</option><option>Regular Morning</option>
+          <option>Evening I</option><option>Evening II</option><option>Defense / Armour Batch</option>
+        </select>
+        <select id="statusFilter" class="sel-styled" onchange="renderStudentFees()"
+          style="padding:.65rem 2.2rem .65rem .9rem;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:10px;color:white;font-family:'Outfit',sans-serif;font-size:.88rem;outline:none;">
+          <option value="all">All Status</option>
+          <option value="paid">Paid</option><option value="pending">Pending</option>
+          <option value="partial">Partial</option><option value="overdue">Overdue</option>
+        </select>
+      </div>
+
+      <!-- Student fee list -->
+      <div class="admin-card" style="padding:0;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 140px;gap:1rem;padding:.75rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.06);">
+          <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Student</div>
+          <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Annual Fee</div>
+          <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Paid</div>
+          <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Due</div>
+          <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Status</div>
+        </div>
+        <div id="feeStudentList">
+          <div style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">Loading...</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Payment Modal -->
+<div class="pay-modal" id="payModal" onclick="closePayModal(event)">
+  <div class="pay-body">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+      <div>
+        <div style="font-size:1.1rem;font-weight:700;color:white;" id="modalStudentName">Student</div>
+        <div style="font-size:.78rem;color:rgba(255,255,255,.4);margin-top:.1rem;" id="modalStudentGrade"></div>
+      </div>
+      <button onclick="closeModal()"
+        style="background:rgba(255,255,255,.06);border:none;color:rgba(255,255,255,.5);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;">✕</button>
+    </div>
+
+    <!-- Payment history -->
+    <div style="margin-bottom:1.5rem;">
+      <div style="font-size:.78rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.65rem;">Payment History</div>
+      <div id="payHistory" style="max-height:200px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Payment form -->
+    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:1.25rem;">
+      <div style="font-size:.78rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:1rem;">Record New Payment</div>
+      <div class="admin-form">
+        <div class="admin-form-row">
+          <div class="form-group">
+            <label>Amount ₹ *</label>
+            <input type="number" id="mAmount" placeholder="e.g. 12000"/>
+          </div>
+          <div class="form-group">
+            <label>Payment Date *</label>
+            <input type="date" id="mDate"/>
+          </div>
+        </div>
+        <div class="admin-form-row">
+          <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="mDueDate"/>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="mStatus" class="sel-styled">
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="partial">Partial</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+        </div>
+        <div class="admin-form-row">
+          <div class="form-group">
+            <label>Payment Method</label>
+            <select id="mMethod" class="sel-styled">
+              <option>Cash</option>
+              <option>UPI</option>
+              <option>Bank Transfer</option>
+              <option>Cheque</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <input type="text" id="mNotes" placeholder="Optional notes"/>
+          </div>
+        </div>
+        <div id="modalMsg"></div>
+        <button class="btn-admin-primary" id="savePaymentBtn" onclick="savePayment()" style="width:100%;justify-content:center;margin-top:.25rem;">✅ Save Payment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="zest-sync.js"></script>
+<script>
+  const esc = ZestSync.escapeHtml;
+
+  ZestSync.guardPage(() => {
+    ZestSync.initSyncBadge();
+    init();
+  });
+
+  let students = [], fees = [], currentStudent = null;
+
+  function normalizeFee(f) {
+    return { ...f, status:(f.status&&f.status!=='undefined')?f.status:'pending', date:(f.date||'').split('T')[0], dueDate:(f.dueDate||'').split('T')[0] };
+  }
+
+  async function init() {
+    students = await ZestSync.getAll('students','zest_students');
+    const rawFees = await ZestSync.getAll('fees','zest_fees');
+    fees = rawFees.map(normalizeFee);
+    renderStudentFees();
+  }
+
+  function renderStudentFees() {
+    const search  = (document.getElementById('searchInput').value||'').toLowerCase();
+    const grade   = document.getElementById('gradeFilter').value;
+    const batch   = document.getElementById('batchFilter').value;
+    const statusF = document.getElementById('statusFilter').value;
+
+    let filtered = students.filter(s => {
+      const ms = !search||(s.name||'').toLowerCase().includes(search)||(s.phone||'').includes(search);
+      const mg = grade==='all'||s.grade===grade;
+      const mb = batch==='all'||s.batch===batch;
+      return ms&&mg&&mb;
+    });
+
+    // Stats
+    let totalCollected=0, totalPending=0, totalOverdue=0;
+    const counted = new Set();
+    fees.forEach(f => {
+      const amt = parseFloat(f.amount)||0;
+      if(f.status==='paid') totalCollected+=amt;
+      else if(f.status==='partial') totalCollected+=amt;
+      else if(f.status==='pending') totalPending+=amt;
+      else if(f.status==='overdue') { totalPending+=amt; if(!counted.has(f.studentId)){totalOverdue++;counted.add(f.studentId);} }
+    });
+    document.getElementById('totalCollected').textContent = '₹'+totalCollected.toLocaleString('en-IN');
+    document.getElementById('totalPending').textContent = '₹'+totalPending.toLocaleString('en-IN');
+    document.getElementById('totalOverdue').textContent = totalOverdue;
+
+    if(statusF!=='all') filtered = filtered.filter(s => {
+      const lf = getLatestFee(s.id, s.name);
+      return (lf?lf.status:(s.feeStatus||'pending'))===statusF;
+    });
+
+    const list = document.getElementById('feeStudentList');
+    if(!filtered.length) { list.innerHTML='<div style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No students found.</div>'; return; }
+    list.innerHTML = filtered.map(s => {
+      const lf = getLatestFee(s.id, s.name);
+      const st = lf ? lf.status : (s.feeStatus||'pending');
+      const paid = fees.filter(f=>(f.studentId===s.id||f.studentName===s.name)&&f.status==='paid').reduce((sum,f)=>sum+parseFloat(f.amount||0),0);
+      const due  = Math.max(0, parseFloat(s.fee||0)-paid);
+      return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 140px;gap:1rem;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .2s;" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''" onclick="openPayModal('${esc(s.id)}')">
+        <div style="display:flex;align-items:center;gap:.75rem;">
+          <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#1B365D,#EBA821);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-weight:900;color:#0F1E3D;">${esc((s.name||'?').charAt(0).toUpperCase())}</div>
+          <div><div style="font-weight:600;">${esc(s.name)}</div><div style="font-size:.72rem;color:rgba(255,255,255,.35);">${esc(s.grade)} · ${esc(s.batch)}</div></div>
+        </div>
+        <div style="font-size:.85rem;">₹${parseFloat(s.fee||0).toLocaleString('en-IN')}/yr</div>
+        <div style="font-weight:600;color:#6EE7B7;">₹${paid.toLocaleString('en-IN')}</div>
+        <div style="color:#FCA5A5;">₹${due.toLocaleString('en-IN')}</div>
+        <div><span class="status-badge ${esc(st)}">${esc(st.charAt(0).toUpperCase()+st.slice(1))}</span></div>
+      </div>`;
+    }).join('');
+  }
+
+  function getLatestFee(studentId, studentName) {
+    const sf = fees.filter(f => f.studentId===studentId||f.studentName===studentName);
+    return sf.length ? sf.reduce((a,b) => new Date(a.date)>new Date(b.date)?a:b) : null;
+  }
+
+  function openPayModal(studentId) {
+    const s = students.find(st => st.id===studentId); if(!s) return;
+    currentStudent = s;
+    document.getElementById('modalStudentName').textContent = s.name;
+    document.getElementById('modalStudentGrade').textContent = (s.grade||'')+(s.batch?' · '+s.batch:'');
+    document.getElementById('mDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('mAmount').value = s.fee||'';
+    document.getElementById('mStatus').value = 'paid';
+    document.getElementById('mNotes').value = '';
+    document.getElementById('mDueDate').value = '';
+    document.getElementById('modalMsg').style.display = 'none';
+    const studentFees = fees.filter(f=>f.studentId===s.id||f.studentName===s.name).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    document.getElementById('payHistory').innerHTML = studentFees.length===0
+      ? '<div style="color:rgba(255,255,255,.3);font-size:.83rem;">No payment records yet.</div>'
+      : studentFees.map(f=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:.65rem .85rem;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:.4rem;">
+          <div><div style="font-size:.85rem;font-weight:600;">₹${parseFloat(f.amount||0).toLocaleString('en-IN')}</div>
+          <div style="font-size:.72rem;color:rgba(255,255,255,.35);">${esc(f.date)||'—'} · ${esc(f.method)||'Cash'}</div></div>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span class="status-badge ${esc(f.status||'pending')}">${esc((f.status||'pending').charAt(0).toUpperCase()+(f.status||'pending').slice(1))}</span>
+            <button onclick="deleteFeeFromModal('${esc(f.id)}')" style="background:none;border:none;color:rgba(239,68,68,.5);cursor:pointer;font-size:.8rem;">✕</button>
+          </div>
+        </div>`).join('');
+    document.getElementById('payModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    document.getElementById('payModal').classList.remove('open');
+    document.body.style.overflow = '';
+    currentStudent = null;
+    document.getElementById('modalMsg').style.display = 'none';
+  }
+
+  function closePayModal(e) {
+    if(e && e.target !== document.getElementById('payModal')) return;
+    closeModal();
+  }
+
+  let _feeSaving = false;
+  async function savePayment() {
+    if(_feeSaving) return;
+    const s = currentStudent; if(!s) return;
+    const amount  = document.getElementById('mAmount').value;
+    const rawDate = document.getElementById('mDate').value;
+    const status  = document.getElementById('mStatus').value||'pending';
+    const method  = document.getElementById('mMethod').value||'Cash';
+    const notes   = document.getElementById('mNotes').value||'';
+    const dueDate = (document.getElementById('mDueDate').value||'').split('T')[0];
+    const msgEl   = document.getElementById('modalMsg');
+
+    if(!amount||!rawDate) { showModalMsg('⚠ Please fill Amount and Date','err'); return; }
+
+    const saveBtn = document.querySelector('.pay-body .btn-admin-primary');
+    _feeSaving = true; if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='⏳ Saving...';}
+
+    const record = {id:'F'+Date.now(),studentId:s.id,studentName:s.name,grade:s.grade||'',amount,date:rawDate.split('T')[0],dueDate,status,method,notes};
+    try {
+      await ZestSync.appendRow('fees','zest_fees',record);
+      fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
+      await ZestSync.updateRow('students','zest_students',s.id,{feeStatus:status});
+      students = await ZestSync.getAll('students','zest_students');
+      showModalMsg('✅ Payment saved!','ok');
+      renderStudentFees();
+      setTimeout(() => openPayModal(s.id), 800);
+    } catch(e) { showModalMsg('❌ Error: '+e.message,'err'); }
+    _feeSaving = false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='✅ Save Payment';}
+  }
+
+  async function deleteFeeFromModal(feeId) {
+    if(!confirm('Delete this payment record?')) return;
+    await ZestSync.deleteRow('fees','zest_fees','id',feeId);
+    fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
+    renderStudentFees();
+    if(currentStudent) openPayModal(currentStudent.id);
+  }
+
+  function showModalMsg(msg, type) {
+    const el = document.getElementById('modalMsg');
+    el.textContent = msg;
+    el.style.cssText = type==='ok'
+      ? 'display:block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#6EE7B7;padding:.6rem .9rem;border-radius:8px;font-size:.83rem;font-weight:600;margin-top:.75rem;'
+      : 'display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.6rem .9rem;border-radius:8px;font-size:.83rem;font-weight:600;margin-top:.75rem;';
+    setTimeout(() => el.style.display='none', 3000);
+  }
+
+  init();
+</script>
+</body>
+</html>
