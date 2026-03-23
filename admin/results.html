@@ -264,10 +264,11 @@
     });
     const tbody = document.getElementById('resultsBody');
     if(!filtered.length) { tbody.innerHTML='<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No results found.</td></tr>'; return; }
+    const subjects = ['Mathematics','Science','English','Social Science','Hindi / Marathi','General Ability (GAT)','General Knowledge','Logical Reasoning','Overall / Full Test'];
     tbody.innerHTML = [...filtered].reverse().map(r => {
       const {g, cls} = gradeFromPct(r.pct);
       const barColor = r.pct>=70?'#10B981':r.pct>=40?'#EBA821':'#EF4444';
-      return `<tr>
+      return `<tr id="resView_${esc(r.id)}">
         <td><div style="font-weight:600;">${esc(r.studentName)}</div><div style="font-size:.75rem;color:rgba(255,255,255,.4);">${esc(r.grade)}</div></td>
         <td style="font-weight:600;color:#fff;">${esc(r.test)}</td>
         <td style="font-size:.83rem;">${esc(r.subject)}</td>
@@ -278,9 +279,56 @@
           <span style="font-size:.82rem;font-weight:600;">${r.pct}%</span></div></td>
         <td><span class="status-badge ${esc(cls)}" style="font-size:.75rem;">${esc(g)}</span></td>
         <td style="font-size:.82rem;">${esc(r.date)||'—'}</td>
-        <td><button onclick="deleteResult('${esc(r.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.2);padding:.3rem .7rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">Delete</button></td>
+        <td style="white-space:nowrap;">
+          <button onclick="editResult('${esc(r.id)}')" style="background:none;border:none;color:rgba(235,168,33,.6);cursor:pointer;font-size:.8rem;" title="Edit">✏️</button>
+          <button onclick="deleteResult('${esc(r.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.2);padding:.3rem .7rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">Delete</button>
+        </td>
+      </tr>
+      <tr id="resEdit_${esc(r.id)}" style="display:none;">
+        <td colspan="8" style="padding:.75rem;">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.5rem;">
+            <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Test</label><input type="text" id="redit_test_${esc(r.id)}" value="${esc(r.test||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+            <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Subject</label><select id="redit_subject_${esc(r.id)}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;">
+              ${subjects.map(s=>'<option value="'+s+'" '+(r.subject===s?'selected':'')+'>'+s+'</option>').join('')}
+            </select></div>
+            <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Date</label><input type="date" id="redit_date_${esc(r.id)}" value="${esc(r.date||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+            <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Marks</label><input type="number" id="redit_marks_${esc(r.id)}" value="${r.marks||''}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+            <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Total</label><input type="number" id="redit_total_${esc(r.id)}" value="${r.total||''}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+            <div><label style="font-size:.6rem;color:rgba(255,255,255,.35);font-weight:700;text-transform:uppercase;">Remarks</label><input type="text" id="redit_remarks_${esc(r.id)}" value="${esc(r.remarks||'')}" style="width:100%;padding:.4rem .5rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;color:white;font-size:.8rem;font-family:'Outfit',sans-serif;box-sizing:border-box;"/></div>
+          </div>
+          <div style="display:flex;gap:.5rem;">
+            <button onclick="saveResultEdit('${esc(r.id)}')" style="background:linear-gradient(135deg,#EBA821,#C98A10);color:#0F1E3D;border:none;padding:.4rem .8rem;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif;">💾 Save</button>
+            <button onclick="document.getElementById('resEdit_${esc(r.id)}').style.display='none';document.getElementById('resView_${esc(r.id)}').style.display='';" style="background:rgba(255,255,255,.05);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.1);padding:.4rem .8rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">Cancel</button>
+          </div>
+        </td>
       </tr>`;
     }).join('');
+  }
+
+  function editResult(id) {
+    document.getElementById('resView_' + id).style.display = 'none';
+    document.getElementById('resEdit_' + id).style.display = '';
+  }
+
+  async function saveResultEdit(id) {
+    try {
+      const marks = parseFloat(document.getElementById('redit_marks_' + id).value);
+      const total = parseFloat(document.getElementById('redit_total_' + id).value);
+      const test  = document.getElementById('redit_test_' + id).value.trim();
+      if (!test || isNaN(marks) || isNaN(total)) { alert('Test, Marks and Total are required.'); return; }
+      if (marks > total) { alert('Marks cannot exceed Total.'); return; }
+      const pct = Math.round((marks / total) * 100);
+      const updates = {
+        test,
+        subject: document.getElementById('redit_subject_' + id).value,
+        marks, total, pct,
+        date:    document.getElementById('redit_date_' + id).value,
+        remarks: document.getElementById('redit_remarks_' + id).value.trim(),
+      };
+      await ZestSync.updateRow('results', 'zest_results', id, updates);
+      results = await ZestSync.getAll('results', 'zest_results');
+      renderResults();
+    } catch(e) { alert('Error: ' + e.message); }
   }
 
   function exportResultsCSV() {
