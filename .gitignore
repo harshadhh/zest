@@ -1,0 +1,28 @@
+# ============================================================
+# CRITICAL — Firebase credentials — NEVER commit these files
+# ============================================================
+firebase-config.js
+admin/firebase-config.js
+**/firebase-config.js
+
+# Also block any accidental env files
+.env
+.env.local
+*.env
+env.js
+admin/env.js
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (if ever used locally)
+node_modules/
+package-lock.json
