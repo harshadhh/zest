@@ -226,6 +226,8 @@ window.ZestSync = (function () {
       // Use .doc(record.id).set() — NOT .add() — so our ID is the Firestore doc ID
       await _db.collection(collection).doc(record.id).set(record);
       await getAll(collection, localKey);
+      // Sync to Google Sheets (fire-and-forget)
+      _syncToSheets('append', { collection, row: record, headers: Object.keys(record) });
       return record.id;
     } else {
       // Offline fallback: append to localStorage only
@@ -237,8 +239,41 @@ window.ZestSync = (function () {
     }
   }
 
+  // ------------------------------------------------------------------
+  // GOOGLE SHEETS 2-WAY SYNC — fire-and-forget, never blocks Firebase ops
+  // ------------------------------------------------------------------
+  function _syncToSheets(action, data) {
+    try {
+      const url = localStorage.getItem('zest_sheets_url');
+      if (!url) return; // No script URL configured
+      const token = sessionStorage.getItem('zest_sheets_token') || '';
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action, token, data }),
+      }).catch(() => {}); // Silent — never block UI
+    } catch (e) {}
+  }
+
+  /**
+   * _syncToAttSheet — fire-and-forget POST to the ATTENDANCE Google Sheet web app.
+   * Uses the separate 'zest_att_sheets_url' saved in Settings.
+   */
+  function _syncToAttSheet(action, data) {
+    try {
+      const url = localStorage.getItem('zest_att_sheets_url');
+      if (!url) return; // No attendance script URL configured
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action, data }),
+      }).catch(() => {}); // Silent — never block UI
+    } catch (e) {}
+  }
+
   /**
    * updateRow — update a single Firestore document, re-fetch to update cache.
+   * Also syncs update to Google Sheets if configured.
    */
   async function updateRow(collection, localKey, docId, updates) {
     const ok = await initFirebase();
@@ -251,10 +286,13 @@ window.ZestSync = (function () {
       const idx = cache.findIndex(r => r.id === docId);
       if (idx !== -1) { cache[idx] = { ...cache[idx], ...updates }; safeSet(localKey, cache); }
     }
+    // Sync to Google Sheets (fire-and-forget)
+    _syncToSheets('update', { collection, idField: 'id', idValue: docId, updates });
   }
 
   /**
    * deleteRow — delete a single Firestore doc, then re-fetch.
+   * Also syncs deletion to Google Sheets if configured.
    * If idField === 'id', delete by doc ID directly.
    * Otherwise, query by field value.
    */
@@ -275,6 +313,8 @@ window.ZestSync = (function () {
       const cache = safeGet(localKey);
       safeSet(localKey, cache.filter(r => r[idField] !== idValue));
     }
+    // Sync to Google Sheets (fire-and-forget)
+    _syncToSheets('delete', { collection, idField, idValue });
   }
 
   /**
@@ -311,6 +351,10 @@ window.ZestSync = (function () {
 
       // Update localStorage cache
       safeSet(localKey, rows);
+
+      // Sync full collection to Google Sheets (fire-and-forget)
+      const headers = rows.length ? Object.keys(rows[0]) : [];
+      _syncToSheets('set', { collection, rows, headers });
     } else {
       safeSet(localKey, rows);
     }
@@ -387,6 +431,9 @@ window.ZestSync = (function () {
         { [dayKey]: dayData },
         { merge: true }
       );
+
+      // Also sync to Attendance Google Sheet (fire-and-forget)
+      _syncToAttSheet('saveAttendance', { date, attendance: dayData, studentMap: _studentMap });
     }
 
     // Update localStorage cache regardless
