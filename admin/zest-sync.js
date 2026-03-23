@@ -287,13 +287,21 @@ window.ZestSync = (function () {
   function _syncToAttSheet(action, data) {
     try {
       const url = localStorage.getItem('zest_att_sheets_url');
-      if (!url) return; // No attendance script URL configured
+      if (!url) {
+        console.warn('[ZestSync] No attendance sheet URL configured — skipping sync.');
+        return;
+      }
+      console.log('[ZestSync] Syncing to Attendance Sheet:', action, Object.keys(data));
       fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action, data }),
-      }).catch(() => {}); // Silent — never block UI
-    } catch (e) {}
+      })
+      .then(r => console.log('[ZestSync] Attendance Sheet sync response:', r.status, r.type))
+      .catch(err => console.warn('[ZestSync] Attendance Sheet sync error:', err.message));
+    } catch (e) {
+      console.warn('[ZestSync] Attendance Sheet sync exception:', e.message);
+    }
   }
 
   /**
@@ -456,10 +464,10 @@ window.ZestSync = (function () {
         { [dayKey]: dayData },
         { merge: true }
       );
-
-      // Also sync to Attendance Google Sheet (fire-and-forget)
-      _syncToAttSheet('saveAttendance', { date, attendance: dayData, studentMap: _studentMap });
     }
+
+    // Sync to Attendance Google Sheet (fire-and-forget, works regardless of Firebase)
+    _syncToAttSheet('saveAttendance', { date, attendance: dayData, studentMap: _studentMap });
 
     // Update localStorage cache regardless
     const cacheKey = 'zest_attendance_' + docId;
