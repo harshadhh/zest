@@ -222,7 +222,7 @@
 
 <!-- Student Popup Modal -->
 <div class="student-modal" id="studentModal" onclick="if(event.target===this)closeStudentPopup()">
-  <div class="admin-modal" style="max-width:600px;">
+  <div class="admin-modal" style="max-width:750px;">
     <div class="admin-modal-header">
       <div class="admin-modal-title" id="popupName">Student Details</div>
       <button class="admin-modal-close" onclick="closeStudentPopup()">✕</button>
@@ -485,9 +485,9 @@
   function openStudentPopup(id) {
     const s = students.find(st => st.id === id); if(!s) return;
     document.getElementById('popupName').textContent = s.name;
-    const avatarHtml = s.photo
-      ? `<img src="${esc(s.photo)}" style="width:80px;height:80px;border-radius:12px;object-fit:cover;cursor:pointer;" onclick="window.open('${esc(s.photo)}','_blank')"/>`
-      : `<div style="width:80px;height:80px;border-radius:12px;background:linear-gradient(135deg,#1B365D,#EBA821);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:2rem;font-weight:900;color:#0F1E3D;">${esc((s.name||'?').charAt(0).toUpperCase())}</div>`;
+    const bigAvatarHtml = s.photo
+      ? `<img src="${esc(s.photo)}" style="width:160px;height:160px;border-radius:14px;object-fit:cover;cursor:pointer;flex-shrink:0;" onclick="window.open('${esc(s.photo)}','_blank')"/>`
+      : `<div style="width:160px;height:160px;border-radius:14px;background:linear-gradient(135deg,#1B365D,#EBA821);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:4rem;font-weight:900;color:#0F1E3D;flex-shrink:0;">${esc((s.name||'?').charAt(0).toUpperCase())}</div>`;
 
     const fields = [
       { key:'name',      label:'Name',       type:'text' },
@@ -502,64 +502,68 @@
       { key:'joinDate',  label:'Joined',      type:'date' },
     ];
 
-    // View mode
     const viewGrid = fields.map(f => {
       let val = s[f.key] || '—';
       if (f.key === 'fee') val = '₹' + parseFloat(s.fee||0).toLocaleString('en-IN');
-      return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:.65rem .9rem;">
-        <div style="font-size:.7rem;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.08em;text-transform:uppercase;">${esc(f.label)}</div>
-        <div style="font-size:.88rem;color:white;margin-top:.2rem;">${esc(val)}</div>
+      return `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:.55rem .75rem;">
+        <div style="font-size:.65rem;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.08em;text-transform:uppercase;">${esc(f.label)}</div>
+        <div style="font-size:.85rem;color:white;margin-top:.15rem;">${esc(val)}</div>
       </div>`;
     }).join('');
 
-    // Edit mode (hidden initially)
     const editGrid = fields.map(f => {
       let input = '';
       if (f.type === 'select') {
-        input = `<select id="edit_${f.key}" style="width:100%;padding:.5rem .65rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;color:white;font-family:'Outfit',sans-serif;font-size:.85rem;">
+        input = `<select id="edit_${f.key}" style="width:100%;padding:.4rem .55rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;color:white;font-family:'Outfit',sans-serif;font-size:.82rem;">
           ${f.options.map(o => `<option value="${esc(o)}" ${(s[f.key]||'')===o?'selected':''}>${esc(o||'— Select —')}</option>`).join('')}
         </select>`;
       } else {
         input = `<input type="${f.type}" id="edit_${f.key}" value="${esc(s[f.key]||'')}"
-          style="width:100%;padding:.5rem .65rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;color:white;font-family:'Outfit',sans-serif;font-size:.85rem;box-sizing:border-box;"/>`;
+          style="width:100%;padding:.4rem .55rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);border-radius:8px;color:white;font-family:'Outfit',sans-serif;font-size:.82rem;box-sizing:border-box;"/>`;
       }
       return `<div>
-        <div style="font-size:.7rem;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.3rem;">${esc(f.label)}</div>
+        <div style="font-size:.65rem;color:rgba(255,255,255,.35);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem;">${esc(f.label)}</div>
         ${input}
       </div>`;
     }).join('');
 
     document.getElementById('popupContent').innerHTML = `
-      <div style="display:flex;gap:1.25rem;margin-bottom:1.5rem;align-items:flex-start;">
-        ${avatarHtml}
-        <div>
-          <div id="popupStudentName" style="font-size:1.15rem;font-weight:700;color:white;">${esc(s.name)}</div>
-          <div style="font-size:.83rem;color:rgba(255,255,255,.4);margin-top:.2rem;">${esc(s.grade)} · ${esc(s.batch)}</div>
-          <span class="status-badge ${esc((s.feeStatus||'pending').toLowerCase())}" style="margin-top:.5rem;display:inline-block;">${esc(s.feeStatus)||'Pending'}</span>
+      <div style="display:flex;gap:1.5rem;align-items:flex-start;flex-wrap:wrap;">
+        <!-- LEFT: Big Photo + Name -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:.65rem;min-width:160px;">
+          ${bigAvatarHtml}
+          <div style="text-align:center;">
+            <div style="font-size:1.1rem;font-weight:700;color:white;">${esc(s.name)}</div>
+            <div style="font-size:.78rem;color:rgba(255,255,255,.4);margin-top:.15rem;">${esc(s.grade)} · ${esc(s.batch)}</div>
+            <span class="status-badge ${esc((s.feeStatus||'pending').toLowerCase())}" style="margin-top:.5rem;display:inline-block;">${esc(s.feeStatus)||'Pending'}</span>
+          </div>
         </div>
-      </div>
 
-      <!-- VIEW MODE -->
-      <div id="viewMode_${esc(s.id)}">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.5rem;">
-          ${viewGrid}
-        </div>
-        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
-          <a href="tel:${esc(s.phone)}" class="btn-admin-primary" style="text-decoration:none;padding:.6rem 1.2rem;font-size:.85rem;">📞 Call</a>
-          <button onclick="enterEditMode('${esc(s.id)}')" style="background:rgba(235,168,33,.1);color:#EBA821;border:1px solid rgba(235,168,33,.25);padding:.6rem 1.2rem;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;">✏️ Edit</button>
-          <button onclick="deleteStudent('${esc(s.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.25);padding:.6rem 1.2rem;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;">🗑 Delete</button>
-        </div>
-      </div>
+        <!-- RIGHT: Details -->
+        <div style="flex:1;min-width:260px;">
+          <!-- VIEW MODE -->
+          <div id="viewMode_${esc(s.id)}">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1.25rem;">
+              ${viewGrid}
+            </div>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+              <a href="tel:${esc(s.phone)}" class="btn-admin-primary" style="text-decoration:none;padding:.55rem 1rem;font-size:.82rem;">📞 Call</a>
+              <button onclick="enterEditMode('${esc(s.id)}')" style="background:rgba(235,168,33,.1);color:#EBA821;border:1px solid rgba(235,168,33,.25);padding:.55rem 1rem;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;">✏️ Edit</button>
+              <button onclick="deleteStudent('${esc(s.id)}')" style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.25);padding:.55rem 1rem;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;">🗑 Delete</button>
+            </div>
+          </div>
 
-      <!-- EDIT MODE (hidden) -->
-      <div id="editMode_${esc(s.id)}" style="display:none;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;">
-          ${editGrid}
-        </div>
-        <div id="editMsg_${esc(s.id)}" style="display:none;margin-bottom:.75rem;"></div>
-        <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
-          <button id="saveEditBtn_${esc(s.id)}" onclick="saveStudentEdit('${esc(s.id)}')" class="btn-admin-primary" style="padding:.6rem 1.5rem;font-size:.85rem;">💾 Save Changes</button>
-          <button onclick="cancelEditMode('${esc(s.id)}')" class="btn-admin-secondary" style="padding:.6rem 1.2rem;font-size:.85rem;">Cancel</button>
+          <!-- EDIT MODE (hidden) -->
+          <div id="editMode_${esc(s.id)}" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.85rem;">
+              ${editGrid}
+            </div>
+            <div id="editMsg_${esc(s.id)}" style="display:none;margin-bottom:.6rem;"></div>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+              <button id="saveEditBtn_${esc(s.id)}" onclick="saveStudentEdit('${esc(s.id)}')" class="btn-admin-primary" style="padding:.55rem 1.25rem;font-size:.82rem;">💾 Save Changes</button>
+              <button onclick="cancelEditMode('${esc(s.id)}')" class="btn-admin-secondary" style="padding:.55rem 1rem;font-size:.82rem;">Cancel</button>
+            </div>
+          </div>
         </div>
       </div>`;
 
