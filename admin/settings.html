@@ -474,8 +474,17 @@
       localStorage.removeItem(key);
     }
     const col = key.replace('zest_','');
-    try { await ZestSync.saveAll(col,key,[]); toast('🗑 Cleared: '+label,'ok'); }
-    catch(e) { toast('🗑 Cleared locally.','ok'); }
+    try { await ZestSync.saveAll(col,key,[]); } catch(e) {}
+    // Also clear attendance sheet if clearing attendance
+    if (key === 'zest_attendance') {
+      try {
+        const attUrl = localStorage.getItem('zest_att_sheets_url');
+        if (attUrl) {
+          fetch(attUrl, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'clearAll',data:{}}) });
+        }
+      } catch(e) {}
+    }
+    toast('🗑 Cleared: '+label,'ok');
   }
 
   async function nukeAll() {
@@ -488,6 +497,13 @@
       const cols = ['students','fees','results','enquiries','attendance'];
       for(const col of cols) await ZestSync.saveAll(col,'zest_'+col,[]);
     } catch(e) { toast('❌ Firestore wipe failed: '+e.message,'err'); return; }
+    // Also clear attendance Google Sheet
+    try {
+      const attUrl = localStorage.getItem('zest_att_sheets_url');
+      if (attUrl) {
+        fetch(attUrl, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'clearAll',data:{}}) });
+      }
+    } catch(e) {}
     const keep = ['zest_pw_hash','zest_sheets_url','zest_att_sheets_url'];
     Object.keys(localStorage).filter(k => k.startsWith('zest_')&&!keep.includes(k)).forEach(k => localStorage.removeItem(k));
     toast('💀 All data wiped.','ok');
