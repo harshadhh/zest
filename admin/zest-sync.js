@@ -291,13 +291,13 @@ window.ZestSync = (function () {
         console.warn('[ZestSync] No attendance sheet URL configured — skipping sync.');
         return;
       }
-      console.log('[ZestSync] Syncing to Attendance Sheet:', action, Object.keys(data));
+      console.debug('[ZestSync] Syncing to Attendance Sheet:', action, Object.keys(data));
       fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action, data }),
       })
-      .then(r => console.log('[ZestSync] Attendance Sheet sync response:', r.status, r.type))
+      .then(r => console.debug('[ZestSync] Attendance Sheet sync response:', r.status, r.type))
       .catch(err => console.warn('[ZestSync] Attendance Sheet sync error:', err.message));
     } catch (e) {
       console.warn('[ZestSync] Attendance Sheet sync exception:', e.message);
