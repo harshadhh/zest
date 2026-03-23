@@ -247,9 +247,11 @@
 
   async function deleteResult(id) {
     if(!confirm('Delete this result?')) return;
-    await ZestSync.deleteRow('results','zest_results','id',id);
-    results = await ZestSync.getAll('results','zest_results');
-    renderResults();
+    try {
+      await ZestSync.deleteRow('results','zest_results','id',id);
+      results = await ZestSync.getAll('results','zest_results');
+      renderResults();
+    } catch(e) { alert('Delete failed: ' + e.message); }
   }
 
   function renderResults() {
