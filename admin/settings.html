@@ -121,11 +121,11 @@
             <div class="admin-card-header">
               <div>
                 <div class="admin-card-title">📊 Google Sheets Integration</div>
-                <div class="admin-card-subtitle">Connect your Apps Script Web App URLs</div>
+                <div class="admin-card-subtitle">Set once — URLs are saved to cloud forever</div>
               </div>
               <span class="pill pill-off" id="sheetsIndicator">⚪ Not Set</span>
             </div>
-            <p style="font-size:.83rem;color:rgba(255,255,255,.45);margin-bottom:1rem;">Paste the Web App URL from each Google Sheets Apps Script deployment. These sync your data to Google Sheets automatically whenever you add, edit, or delete records.</p>
+            <p style="font-size:.83rem;color:rgba(255,255,255,.45);margin-bottom:1rem;">Paste the Web App URL from each Google Sheets Apps Script deployment. <strong style="color:#6EE7B7;">URLs are saved to Firebase</strong> — set them once and they'll auto-load on every device, every session. No need to re-enter daily!</p>
             <div class="admin-form">
               <div class="form-group">
                 <label>📋 Main Sheet Script URL</label>
@@ -338,24 +338,25 @@
   }
 
   // ── Google Sheets URL Management ──────────────────────────────────────
-  function saveSheetsUrls() {
+  async function saveSheetsUrls() {
     const sUrl   = (document.getElementById('sheetsUrl')||{}).value?.trim() || '';
     const attUrl = (document.getElementById('attSheetsUrl')||{}).value?.trim() || '';
     const msg    = document.getElementById('sheetsMsg');
     const si     = document.getElementById('sheetsIndicator');
 
-    if (sUrl) localStorage.setItem('zest_sheets_url', sUrl);
-    else localStorage.removeItem('zest_sheets_url');
-
-    if (attUrl) localStorage.setItem('zest_att_sheets_url', attUrl);
-    else localStorage.removeItem('zest_att_sheets_url');
+    // Save to BOTH localStorage AND Firestore (persists forever)
+    try {
+      await ZestSync.saveSheetUrls(sUrl, attUrl);
+    } catch(e) {
+      console.warn('Could not save URLs to Firestore:', e.message);
+    }
 
     const saved = [];
     if (sUrl) saved.push('Main Sheet');
     if (attUrl) saved.push('Attendance Sheet');
 
     if (saved.length) {
-      showInline(msg, '✅ Saved: ' + saved.join(' + ') + '. Data will now sync automatically!', 'ok');
+      showInline(msg, '✅ Saved to cloud! ' + saved.join(' + ') + ' URLs will auto-load on every device — no need to re-enter.', 'ok');
       if (si) { si.textContent = '🟢 ' + (sUrl && attUrl ? 'Both Set' : saved[0] + ' Set'); si.className = 'pill pill-live'; }
     } else {
       showInline(msg, '⚠ No URLs entered. Google Sheets sync is disabled.', 'err');
