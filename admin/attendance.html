@@ -135,6 +135,8 @@
 
   const todayStr = new Date().toISOString().split('T')[0];
   let currentStatus = {};
+  let _originalStatus = {};  // Tracks what was loaded — only save what changed
+  let _changedIds = new Set();  // Student IDs that were modified this session
   let _allStudents  = [];
   let _filteredStudents = [];
   let _attSaving    = false;
@@ -162,7 +164,12 @@
     const savedDay = await ZestSync.getAttendance(date);
 
     currentStatus = {};
-    _allStudents.forEach(s => { currentStatus[s.id] = savedDay[s.id] || ''; });
+    _originalStatus = {};
+    _changedIds = new Set();
+    _allStudents.forEach(s => {
+      currentStatus[s.id] = savedDay[s.id] || '';
+      _originalStatus[s.id] = savedDay[s.id] || '';  // Remember original state
+    });
 
     const filtered = _allStudents.filter(s => {
       const bm = batchF === 'all' || s.batch === batchF;
@@ -196,6 +203,8 @@
 
   function setStatus(id, status) {
     currentStatus[id] = status;
+    // Track that this student was explicitly changed
+    if (status !== _originalStatus[id]) _changedIds.add(id);
     const row = document.getElementById('row-'+id); if(!row) return;
     row.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active'));
     if(status==='present') row.querySelector('.att-btn.p').classList.add('active');
@@ -204,7 +213,9 @@
     updateSummary();
   }
 
-  function markAll(status) { _filteredStudents.forEach(s => setStatus(s.id, status)); }
+  function markAll(status) {
+    _filteredStudents.forEach(s => setStatus(s.id, status));
+  }
 
   function updateSummary() {
     // Count only filtered students' statuses
@@ -226,11 +237,12 @@
     const saveBtn = document.querySelector('.admin-header .btn-admin-primary');
     if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving...'; }
     const date = document.getElementById('attDate').value;
-    // Only send statuses that have a value (skip unset students to avoid overwriting other batches)
+    // Only send statuses that were actually CHANGED in this session
     const filteredStatus = {};
     const studentMap = {};
-    Object.entries(currentStatus).forEach(([id, status]) => {
-      if (status) { // Only include students with P/A/L set
+    _changedIds.forEach(id => {
+      const status = currentStatus[id];
+      if (status) {
         filteredStatus[id] = status;
         const s = _allStudents.find(st => st.id === id);
         if (s) studentMap[id] = {name:s.name,grade:s.grade,batch:s.batch};
