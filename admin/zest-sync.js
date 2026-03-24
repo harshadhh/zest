@@ -462,8 +462,12 @@ window.ZestSync = (function () {
       safeSet(localKey, rows);
 
       // Sync full collection to Google Sheets (fire-and-forget)
-      const headers = rows.length ? Object.keys(rows[0]) : [];
-      _syncToSheets('set', { collection, rows, headers });
+      // FIX: don't send empty headers array — Apps Script uses its HEADERS
+      // constant as the fallback, which always has the correct column names.
+      const sheetPayload = rows.length
+        ? { collection, rows, headers: Object.keys(rows[0]) }
+        : { collection, rows };  // omit headers so Apps Script uses its HEADERS constant
+      _syncToSheets('set', sheetPayload);
     } else {
       safeSet(localKey, rows);
     }
