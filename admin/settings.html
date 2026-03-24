@@ -215,6 +215,23 @@
             </div>
           </div>
 
+          <!-- Maintenance Zone -->
+          <div class="admin-card" style="margin-top:1.5rem;border-color:rgba(235,168,33,.2);">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-title" style="color:#EBA821;">🔧 Maintenance</div>
+                <div class="admin-card-subtitle">System optimization tools</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:.65rem;">
+              <button id="btnMigratePhotos" onclick="runPhotoMigration()"
+                style="background:rgba(235,168,33,.1);color:#EBA821;border:1px solid rgba(235,168,33,.2);padding:.7rem 1rem;border-radius:10px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;text-align:left;line-height:1.4;">
+                <div style="font-size:.9rem;">🖼 Migrate Old Photos to Storage</div>
+                <div style="font-size:.7rem;font-weight:400;color:rgba(235,168,33,.7);margin-top:.2rem;">Fixes slowness caused by legacy Base64 photos. Run this once if the app feels slow to load.</div>
+              </button>
+            </div>
+          </div>
+
           <!-- Danger Zone -->
           <div class="admin-card danger-card">
             <div class="admin-card-header">
@@ -508,6 +525,28 @@
     const keep = ['zest_pw_hash','zest_sheets_url','zest_att_sheets_url'];
     Object.keys(localStorage).filter(k => k.startsWith('zest_')&&!keep.includes(k)).forEach(k => localStorage.removeItem(k));
     toast('💀 All data wiped.','ok');
+    setTimeout(() => window.location.reload(), 2000);
+  }
+
+  async function runPhotoMigration() {
+    if (!confirm('This will scan all students and move any old Base64 photos into Firebase Storage permanently. This might take a minute.\\n\\nProceed?')) return;
+    const btn = document.getElementById('btnMigratePhotos');
+    btn.disabled = true;
+    
+    try {
+      btn.innerHTML = '⏳ Initializing migration...';
+      const results = await ZestSync.migrateBase64Photos((progress) => {
+        btn.innerHTML = `⏳ Migrating... (${progress.migrated} done, ${progress.errors} errors, ${progress.total} total scanned)`;
+      });
+      
+      const msg = `✅ Migration complete!\\n\\nMoved ${results.migrated} photos to Storage.\\nFound ${results.skipped} modern/blank photos.\\nErrors: ${results.errors}`;
+      btn.innerHTML = `<div style="font-size:.9rem;">🖼 Migrate Old Photos to Storage</div><div style="font-size:.7rem;font-weight:400;color:rgba(235,168,33,.7);margin-top:.2rem;">${msg.replace(/\\n/g, '<br/>')}</div>`;
+      alert(msg);
+    } catch (e) {
+      alert('Migration failed: ' + e.message);
+      btn.disabled = false;
+      btn.innerHTML = `<div style="font-size:.9rem;">🖼 Migrate Old Photos to Storage</div><div style="font-size:.7rem;font-weight:400;color:rgba(235,168,33,.7);margin-top:.2rem;">Migration error. Click to try again.</div>`;
+    }
   }
 
   function showInline(el, msg, type) {
