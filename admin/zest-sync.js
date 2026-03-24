@@ -101,6 +101,12 @@ window.ZestSync = (function () {
 
         _ready = true;
         _showBadge(_currentUser ? 'live' : 'unauthed');
+
+        // Auto-load saved Google Sheet URLs from Firestore into localStorage
+        if (_currentUser) {
+          _loadSheetUrlsFromFirestore().catch(() => {});
+        }
+
         return true;
 
       } catch (e) {
@@ -278,6 +284,52 @@ window.ZestSync = (function () {
         body: JSON.stringify({ action, data: cleanData }),
       }).catch(() => {}); // Silent — never block UI
     } catch (e) {}
+  }
+
+  // ------------------------------------------------------------------
+  // SHEET URL PERSISTENCE — save/load Google Sheet URLs in Firestore
+  // so the user only needs to set them once, not every day.
+  // ------------------------------------------------------------------
+
+  /**
+   * saveSheetUrls — persist both Sheet URLs to Firestore config/sheetUrls.
+   * Also saves to localStorage as before for immediate use.
+   */
+  async function saveSheetUrls(mainUrl, attUrl) {
+    // Always save to localStorage for immediate use
+    if (mainUrl) localStorage.setItem('zest_sheets_url', mainUrl);
+    else localStorage.removeItem('zest_sheets_url');
+
+    if (attUrl) localStorage.setItem('zest_att_sheets_url', attUrl);
+    else localStorage.removeItem('zest_att_sheets_url');
+
+    // Persist to Firestore so they survive browser data clears
+    const ok = await initFirebase();
+    if (ok && _db && _currentUser) {
+      await _db.collection('config').doc('sheetUrls').set({
+        mainSheetUrl: mainUrl || '',
+        attSheetUrl: attUrl || '',
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   * _loadSheetUrlsFromFirestore — called automatically on every page load
+   * during initFirebase. Restores URLs from Firestore into localStorage.
+   */
+  async function _loadSheetUrlsFromFirestore() {
+    if (!_db || !_currentUser) return;
+    try {
+      const snap = await _db.collection('config').doc('sheetUrls').get();
+      if (snap.exists) {
+        const data = snap.data();
+        if (data.mainSheetUrl) localStorage.setItem('zest_sheets_url', data.mainSheetUrl);
+        if (data.attSheetUrl)  localStorage.setItem('zest_att_sheets_url', data.attSheetUrl);
+      }
+    } catch (e) {
+      console.warn('[ZestSync] Could not load sheet URLs from Firestore:', e.message);
+    }
   }
 
   /**
@@ -625,6 +677,9 @@ window.ZestSync = (function () {
     // Attendance
     saveAttendanceToSheet,
     getAttendance,
+
+    // Config
+    saveSheetUrls,
 
     // Utils
     testConnection,
