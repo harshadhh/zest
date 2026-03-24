@@ -102,6 +102,14 @@ window.ZestSync = (function () {
         _ready = true;
         _showBadge(_currentUser ? 'live' : 'unauthed');
 
+        // FIX #16: Persistent auth listener — keeps _currentUser fresh as
+        // Firebase silently refreshes tokens every hour. Without this,
+        // writes fail after ~1hr with auth/token-expired.
+        _auth.onAuthStateChanged(user => {
+          _currentUser = user;
+          _showBadge(user ? 'live' : 'unauthed');
+        });
+
         // Auto-load saved Google Sheet URLs from Firestore into localStorage
         if (_currentUser) {
           _loadSheetUrlsFromFirestore().catch(() => {});
@@ -140,6 +148,17 @@ window.ZestSync = (function () {
 
   function isLive() {
     return _ready && _db && !!_currentUser;
+  }
+
+  /**
+   * uid(prefix) — FIX #12: collision-safe ID generator.
+   * Combines Date.now() with a 6-char random suffix so two records
+   * created in the same millisecond never share the same ID.
+   * Usage: uid('S') → 'S1711271234567_a3f9k2'
+   */
+  function uid(prefix) {
+    const rand = Math.random().toString(36).slice(2, 8);
+    return `${prefix || ''}${Date.now()}_${rand}`;
   }
 
   // ------------------------------------------------------------------
@@ -403,34 +422,39 @@ window.ZestSync = (function () {
   }
 
   /**
-   * saveAll — delete entire collection + rewrite in chunks of 490.
-   * Respects Firestore 500-op batch limit.
+   * saveAll — SAFE upsert pattern: write first, then delete stale docs.
+   * If a crash happens mid-operation, data is never lost — at worst
+   * some stale docs remain until the next sync.
+   * Respects Firestore 500-op batch limit (chunks of 490).
    */
   async function saveAll(collection, localKey, rows) {
     const ok = await initFirebase();
     if (ok && _db) {
-      // PHASE 1: Delete all existing docs in chunks of 490
-      const existingSnap = await _db.collection(collection).get();
-      const allDocs = [];
-      existingSnap.forEach(doc => allDocs.push(doc.ref));
-
-      for (let i = 0; i < allDocs.length; i += 490) {
-        const chunk = allDocs.slice(i, i + 490);
-        const batch = _db.batch();
-        chunk.forEach(ref => batch.delete(ref));
-        await batch.commit();
-      }
-
-      // PHASE 2: Write new rows in chunks of 490
+      // PHASE 1: Upsert all new/updated rows FIRST (data is safe from this point)
+      const newIds = new Set();
       for (let i = 0; i < rows.length; i += 490) {
         const chunk = rows.slice(i, i + 490);
         const batch = _db.batch();
         chunk.forEach(row => {
-          const ref = row.id
-            ? _db.collection(collection).doc(row.id)
-            : _db.collection(collection).doc();
-          batch.set(ref, row);
+          const id = row.id || (collection.charAt(0).toUpperCase() + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+          if (!row.id) row.id = id;
+          newIds.add(id);
+          batch.set(_db.collection(collection).doc(id), row);
         });
+        await batch.commit();
+      }
+
+      // PHASE 2: Delete stale docs that are NOT in the new set
+      // (safe — if crash happens here, worst case is extra docs remain)
+      const existingSnap = await _db.collection(collection).get();
+      const staleDocs = [];
+      existingSnap.forEach(doc => {
+        if (!newIds.has(doc.id)) staleDocs.push(doc.ref);
+      });
+      for (let i = 0; i < staleDocs.length; i += 490) {
+        const chunk = staleDocs.slice(i, i + 490);
+        const batch = _db.batch();
+        chunk.forEach(ref => batch.delete(ref));
         await batch.commit();
       }
 
@@ -443,6 +467,102 @@ window.ZestSync = (function () {
     } else {
       safeSet(localKey, rows);
     }
+  }
+
+  // ------------------------------------------------------------------
+  // CASCADE OPERATIONS — for data integrity
+  // ------------------------------------------------------------------
+
+  /**
+   * deleteStudentCascade — delete a student AND all related data:
+   * fees, results, and attendance entries for that student ID.
+   * Prevents orphaned records.
+   */
+  async function deleteStudentCascade(studentId) {
+    const ok = await initFirebase();
+    if (!ok || !_db) throw new Error('Firebase not available');
+
+    // 1. Delete from students
+    await _db.collection('students').doc(studentId).delete();
+    _syncToSheets('delete', { collection: 'students', idField: 'id', idValue: studentId });
+
+    // 2. Delete all fee records for this student
+    const feeSnap = await _db.collection('fees').where('studentId', '==', studentId).get();
+    if (!feeSnap.empty) {
+      const batch = _db.batch();
+      feeSnap.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+    _syncToSheets('delete', { collection: 'fees', idField: 'studentId', idValue: studentId });
+
+    // 3. Delete all result records for this student
+    const resSnap = await _db.collection('results').where('studentId', '==', studentId).get();
+    if (!resSnap.empty) {
+      const batch = _db.batch();
+      resSnap.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+    _syncToSheets('delete', { collection: 'results', idField: 'studentId', idValue: studentId });
+
+    // 4. Remove from attendance documents (all months)
+    // Attendance docs store { day_X: { studentId: status } }
+    // Remove studentId key from each day object
+    const attSnap = await _db.collection('attendance').get();
+    const attBatch = _db.batch();
+    let attUpdates = 0;
+    attSnap.forEach(doc => {
+      const data = doc.data();
+      const updates = {};
+      let hasUpdate = false;
+      Object.entries(data).forEach(([dayKey, dayData]) => {
+        if (typeof dayData === 'object' && dayData[studentId] !== undefined) {
+          const cleaned = { ...dayData };
+          delete cleaned[studentId];
+          updates[dayKey] = cleaned;
+          hasUpdate = true;
+        }
+      });
+      if (hasUpdate) {
+        attBatch.update(doc.ref, updates);
+        attUpdates++;
+      }
+    });
+    if (attUpdates > 0) await attBatch.commit();
+
+    // 5. Refresh localStorage caches
+    await getAll('students', 'zest_students');
+    await getAll('fees', 'zest_fees');
+    await getAll('results', 'zest_results');
+  }
+
+  /**
+   * propagateStudentNameChange — when a student's name is edited,
+   * update the studentName field in all their fee and result records.
+   * Prevents orphaned references.
+   */
+  async function propagateStudentNameChange(studentId, newName) {
+    const ok = await initFirebase();
+    if (!ok || !_db) return;
+
+    // Update fees
+    const feeSnap = await _db.collection('fees').where('studentId', '==', studentId).get();
+    if (!feeSnap.empty) {
+      const batch = _db.batch();
+      feeSnap.forEach(doc => batch.update(doc.ref, { studentName: newName }));
+      await batch.commit();
+    }
+
+    // Update results
+    const resSnap = await _db.collection('results').where('studentId', '==', studentId).get();
+    if (!resSnap.empty) {
+      const batch = _db.batch();
+      resSnap.forEach(doc => batch.update(doc.ref, { studentName: newName }));
+      await batch.commit();
+    }
+
+    // Refresh caches
+    await getAll('fees', 'zest_fees');
+    await getAll('results', 'zest_results');
   }
 
   // ------------------------------------------------------------------
@@ -476,7 +596,7 @@ window.ZestSync = (function () {
       : fileOrDataUrl;
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Photo upload timed out')), 8000);
+      const timeout = setTimeout(() => reject(new Error('Photo upload timed out')), 30000);
       const ref  = _storage.ref('photos/' + studentId + '.jpg');
       const task = ref.put(blob);
       task.then(async () => {
@@ -492,6 +612,44 @@ window.ZestSync = (function () {
         reject(e);
       });
     });
+  }
+
+  /**
+   * migrateBase64Photos — FIX #10: one-time migration utility.
+   * Scans all student documents for base64 photos (stored inline in Firestore),
+   * uploads them to Firebase Storage, then replaces the blob with a clean URL.
+   * Run this once from Settings to clean up existing data.
+   * Returns { migrated, skipped, errors } counts.
+   */
+  async function migrateBase64Photos(onProgress) {
+    const ok = await initFirebase();
+    if (!ok || !_db || !_storage) throw new Error('Firebase not available');
+
+    const snap = await _db.collection('students').get();
+    let migrated = 0, skipped = 0, errors = 0;
+
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (!data.photo || !data.photo.startsWith('data:')) {
+        skipped++;
+        if (onProgress) onProgress({ migrated, skipped, errors, total: snap.size });
+        continue;
+      }
+
+      try {
+        const url = await uploadPhoto(data.id || doc.id, data.photo);
+        await _db.collection('students').doc(doc.id).update({ photo: url });
+        migrated++;
+      } catch (e) {
+        console.warn('[ZestSync] migrateBase64Photos failed for', doc.id, e.message);
+        errors++;
+      }
+      if (onProgress) onProgress({ migrated, skipped, errors, total: snap.size });
+    }
+
+    // Refresh student cache
+    await getAll('students', 'zest_students');
+    return { migrated, skipped, errors };
   }
 
   // ------------------------------------------------------------------
@@ -670,6 +828,8 @@ window.ZestSync = (function () {
     updateRow,
     deleteRow,
     saveAll,
+    deleteStudentCascade,
+    propagateStudentNameChange,
 
     // Photo
     uploadPhoto,
@@ -686,6 +846,8 @@ window.ZestSync = (function () {
     pushAllToFirestore,
     pullFromFirestore,
     escapeHtml,
+    uid,
+    migrateBase64Photos,
 
     // Expose db for advanced use (settings page danger zone only)
     getDb: () => _db,
