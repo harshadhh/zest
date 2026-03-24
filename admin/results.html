@@ -156,6 +156,9 @@
         </div>
       </div>
 
+      <!-- Pagination -->
+      <div id="paginationControls" style="display:flex;align-items:center;justify-content:center;gap:1rem;padding:1rem 0;"></div>
+
     </div>
   </main>
 </div>
@@ -171,6 +174,8 @@
   });
 
   let results = [], students = [];
+  let _currentPage = 1;
+  const PAGE_SIZE = 25;
 
   function toggleResultForm() {
     const f = document.getElementById('addResultForm');
@@ -230,7 +235,7 @@
     try {
       const student = students.find(s => s.id===studentId);
       const pct = Math.round((marks/total)*100);
-      const result = {id:'R'+Date.now(),studentId,studentName:student?student.name:'',grade:student?student.grade:'',test,subject,marks,total,pct,date,remarks};
+      const result = {id:ZestSync.uid('R'),studentId,studentName:student?student.name:'',grade:student?student.grade:'',test,subject,marks,total,pct,date,remarks};
       await ZestSync.appendRow('results','zest_results',result);
       results = await ZestSync.getAll('results','zest_results');
       ['rTest','rMarks','rTotal','rRemarks'].forEach(id => document.getElementById(id).value='');
@@ -262,10 +267,22 @@
       const mj = subF==='all'||r.subject===subF;
       return ms && mj;
     });
+
+    // Pagination
+    const reversed = [...filtered].reverse();
+    const totalPages = Math.max(1, Math.ceil(reversed.length / PAGE_SIZE));
+    if (_currentPage > totalPages) _currentPage = totalPages;
+    const startIdx = (_currentPage - 1) * PAGE_SIZE;
+    const pageItems = reversed.slice(startIdx, startIdx + PAGE_SIZE);
+
     const tbody = document.getElementById('resultsBody');
-    if(!filtered.length) { tbody.innerHTML='<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No results found.</td></tr>'; return; }
+    if(!filtered.length) {
+      tbody.innerHTML='<tr><td colspan="8" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No results found.</td></tr>';
+      document.getElementById('paginationControls').innerHTML = '';
+      return;
+    }
     const subjects = ['Mathematics','Science','English','Social Science','Hindi / Marathi','General Ability (GAT)','General Knowledge','Logical Reasoning','Overall / Full Test'];
-    tbody.innerHTML = [...filtered].reverse().map(r => {
+    tbody.innerHTML = pageItems.map(r => {
       const {g, cls} = gradeFromPct(r.pct);
       const barColor = r.pct>=70?'#10B981':r.pct>=40?'#EBA821':'#EF4444';
       return `<tr id="resView_${esc(r.id)}">
@@ -303,6 +320,18 @@
         </td>
       </tr>`;
     }).join('');
+
+    // Pagination controls
+    const pc = document.getElementById('paginationControls');
+    if (totalPages <= 1) { pc.innerHTML = ''; return; }
+    const btnStyle = "background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);padding:.4rem .7rem;border-radius:8px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.78rem;";
+    pc.innerHTML = `
+      <button onclick="_currentPage=1;renderResults()" style="${btnStyle}" ${_currentPage===1?'disabled':''}>&laquo;</button>
+      <button onclick="_currentPage--;renderResults()" style="${btnStyle}" ${_currentPage===1?'disabled':''}>&lsaquo; Prev</button>
+      <span style="font-size:.82rem;color:rgba(255,255,255,.5);">${_currentPage} / ${totalPages} (${filtered.length} results)</span>
+      <button onclick="_currentPage++;renderResults()" style="${btnStyle}" ${_currentPage===totalPages?'disabled':''}>Next &rsaquo;</button>
+      <button onclick="_currentPage=${totalPages};renderResults()" style="${btnStyle}" ${_currentPage===totalPages?'disabled':''}>&raquo;</button>
+    `;
   }
 
   function editResult(id) {
