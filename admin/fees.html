@@ -122,6 +122,9 @@
         </div>
       </div>
 
+      <!-- Pagination -->
+      <div id="feePaginationControls" style="display:flex;align-items:center;justify-content:center;gap:1rem;padding:1rem 0;"></div>
+
     </div>
   </main>
 </div>
@@ -206,6 +209,8 @@
   });
 
   let students = [], fees = [], currentStudent = null;
+  let _currentPage = 1;
+  const PAGE_SIZE = 25;
 
   function normalizeFee(f) {
     return { ...f, status:(f.status&&f.status!=='undefined')?f.status:'pending', date:(f.date||'').split('T')[0], dueDate:(f.dueDate||'').split('T')[0] };
@@ -250,12 +255,22 @@
       return (lf?lf.status:(s.feeStatus||'pending'))===statusF;
     });
 
+    // Pagination
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if (_currentPage > totalPages) _currentPage = totalPages;
+    const startIdx = (_currentPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(startIdx, startIdx + PAGE_SIZE);
+
     const list = document.getElementById('feeStudentList');
-    if(!filtered.length) { list.innerHTML='<div style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No students found.</div>'; return; }
-    list.innerHTML = filtered.map(s => {
+    if(!filtered.length) {
+      list.innerHTML='<div style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No students found.</div>';
+      document.getElementById('feePaginationControls').innerHTML = '';
+      return;
+    }
+    list.innerHTML = pageItems.map(s => {
       const lf = getLatestFee(s.id, s.name);
       const st = lf ? lf.status : (s.feeStatus||'pending');
-      const paid = fees.filter(f=>(f.studentId===s.id||f.studentName===s.name)&&f.status==='paid').reduce((sum,f)=>sum+parseFloat(f.amount||0),0);
+      const paid = fees.filter(f=>(f.studentId===s.id|((!f.studentId)&&f.studentName===s.name))&&f.status==='paid').reduce((sum,f)=>sum+parseFloat(f.amount||0),0);
       const due  = Math.max(0, parseFloat(s.fee||0)-paid);
       return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 140px;gap:1rem;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .2s;" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''" onclick="openPayModal('${esc(s.id)}')">
         <div style="display:flex;align-items:center;gap:.75rem;">
@@ -268,10 +283,22 @@
         <div><span class="status-badge ${esc(st)}">${esc(st.charAt(0).toUpperCase()+st.slice(1))}</span></div>
       </div>`;
     }).join('');
+
+    // Pagination controls
+    const pc = document.getElementById('feePaginationControls');
+    if (totalPages <= 1) { pc.innerHTML = ''; return; }
+    const btnStyle = "background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);padding:.4rem .7rem;border-radius:8px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.78rem;";
+    pc.innerHTML = `
+      <button onclick="_currentPage=1;renderStudentFees()" style="${btnStyle}" ${_currentPage===1?'disabled':''}>&laquo;</button>
+      <button onclick="_currentPage--;renderStudentFees()" style="${btnStyle}" ${_currentPage===1?'disabled':''}>&lsaquo; Prev</button>
+      <span style="font-size:.82rem;color:rgba(255,255,255,.5);">${_currentPage} / ${totalPages} (${filtered.length} students)</span>
+      <button onclick="_currentPage++;renderStudentFees()" style="${btnStyle}" ${_currentPage===totalPages?'disabled':''}>Next &rsaquo;</button>
+      <button onclick="_currentPage=${totalPages};renderStudentFees()" style="${btnStyle}" ${_currentPage===totalPages?'disabled':''}>&raquo;</button>
+    `;
   }
 
   function getLatestFee(studentId, studentName) {
-    const sf = fees.filter(f => f.studentId===studentId||f.studentName===studentName);
+    const sf = fees.filter(f => f.studentId===studentId||((!f.studentId)&&f.studentName===studentName));
     return sf.length ? sf.reduce((a,b) => new Date(a.date)>new Date(b.date)?a:b) : null;
   }
 
@@ -286,7 +313,7 @@
     document.getElementById('mNotes').value = '';
     document.getElementById('mDueDate').value = '';
     document.getElementById('modalMsg').style.display = 'none';
-    const studentFees = fees.filter(f=>f.studentId===s.id||f.studentName===s.name).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const studentFees = fees.filter(f=>f.studentId===s.id||((!f.studentId)&&f.studentName===s.name)).sort((a,b)=>new Date(b.date)-new Date(a.date));
     document.getElementById('payHistory').innerHTML = studentFees.length===0
       ? '<div style="color:rgba(255,255,255,.3);font-size:.83rem;">No payment records yet.</div>'
       : studentFees.map(f=>`<div id="feeView_${esc(f.id)}" style="display:flex;justify-content:space-between;align-items:center;padding:.65rem .85rem;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:.4rem;">
@@ -347,7 +374,7 @@
     const saveBtn = document.querySelector('.pay-body .btn-admin-primary');
     _feeSaving = true; if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='⏳ Saving...';}
 
-    const record = {id:'F'+Date.now(),studentId:s.id,studentName:s.name,grade:s.grade||'',amount,date:rawDate.split('T')[0],dueDate,status,method,notes};
+    const record = {id:ZestSync.uid('F'),studentId:s.id,studentName:s.name,grade:s.grade||'',amount,date:rawDate.split('T')[0],dueDate,status,method,notes};
     try {
       await ZestSync.appendRow('fees','zest_fees',record);
       fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
