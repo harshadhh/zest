@@ -110,11 +110,13 @@
 
       <!-- Student fee list -->
       <div class="admin-card" style="padding:0;overflow:hidden;">
-        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 140px;gap:1rem;padding:.75rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.06);">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr 140px;gap:1rem;padding:.75rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.06);">
           <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Student</div>
           <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Annual Fee</div>
           <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Paid</div>
           <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Due</div>
+          <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Last Payment</div>
+          <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Method</div>
           <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.08em;text-transform:uppercase;">Status</div>
         </div>
         <div id="feeStudentList">
@@ -272,7 +274,7 @@
       const st = lf ? lf.status : (s.feeStatus||'pending');
       const paid = fees.filter(f=>(f.studentId===s.id|((!f.studentId)&&f.studentName===s.name))&&f.status==='paid').reduce((sum,f)=>sum+parseFloat(f.amount||0),0);
       const due  = Math.max(0, parseFloat(s.fee||0)-paid);
-      return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 140px;gap:1rem;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .2s;" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''" onclick="openPayModal('${esc(s.id)}')">
+      return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr 140px;gap:1rem;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .2s;" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''" onclick="openPayModal('${esc(s.id)}')">
         <div style="display:flex;align-items:center;gap:.75rem;">
           <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#1B365D,#EBA821);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-weight:900;color:#0F1E3D;">${esc((s.name||'?').charAt(0).toUpperCase())}</div>
           <div><div style="font-weight:600;">${esc(s.name)}</div><div style="font-size:.72rem;color:rgba(255,255,255,.35);">${esc(s.grade)} · ${esc(s.batch)}</div></div>
@@ -280,6 +282,8 @@
         <div style="font-size:.85rem;">₹${parseFloat(s.fee||0).toLocaleString('en-IN')}/yr</div>
         <div style="font-weight:600;color:#6EE7B7;">₹${paid.toLocaleString('en-IN')}</div>
         <div style="color:#FCA5A5;">₹${due.toLocaleString('en-IN')}</div>
+        <div style="font-size:.8rem;color:rgba(255,255,255,.5);">${esc(lf&&lf.date ? lf.date : '—')}</div>
+        <div style="font-size:.8rem;color:rgba(255,255,255,.5);">${esc(lf&&lf.method ? lf.method : '—')}</div>
         <div><span class="status-badge ${esc(st)}">${esc(st.charAt(0).toUpperCase()+st.slice(1))}</span></div>
       </div>`;
     }).join('');
