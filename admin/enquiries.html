@@ -176,6 +176,9 @@
         </div>
       </div>
 
+      <!-- Pagination -->
+      <div id="paginationControls" style="display:flex;align-items:center;justify-content:center;gap:1rem;padding:1rem 0;"></div>
+
     </div>
   </main>
 </div>
@@ -191,6 +194,8 @@
   });
 
   let enquiries = [];
+  let _currentPage = 1;
+  const PAGE_SIZE = 25;
 
   function toggleEnqForm() {
     const f = document.getElementById('addEnqForm');
@@ -220,7 +225,7 @@
 
     try {
       const newEnq = {
-        id: 'E'+Date.now(), studentName, phone,
+        id: ZestSync.uid('E'), studentName, phone,
         parentName: document.getElementById('eParentName').value.trim(),
         email:      document.getElementById('eEmail').value.trim(),
         interest:   document.getElementById('eInterest').value,
@@ -294,9 +299,21 @@
     document.getElementById('newEnq').textContent = enquiries.filter(e=>e.status==='new').length;
     document.getElementById('contactedEnq').textContent = enquiries.filter(e=>e.status==='contacted').length;
     document.getElementById('convertedEnq').textContent = enquiries.filter(e=>e.status==='converted').length;
+
+    // Pagination
+    const reversed = [...filtered].reverse();
+    const totalPages = Math.max(1, Math.ceil(reversed.length / PAGE_SIZE));
+    if (_currentPage > totalPages) _currentPage = totalPages;
+    const startIdx = (_currentPage - 1) * PAGE_SIZE;
+    const pageItems = reversed.slice(startIdx, startIdx + PAGE_SIZE);
+
     const tbody = document.getElementById('enqBody');
-    if(!filtered.length) { tbody.innerHTML='<tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No enquiries found.</td></tr>'; return; }
-    tbody.innerHTML = [...filtered].reverse().map(e => `<tr id="enqView_${esc(e.id)}">
+    if(!filtered.length) {
+      tbody.innerHTML='<tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No enquiries found.</td></tr>';
+      document.getElementById('paginationControls').innerHTML = '';
+      return;
+    }
+    tbody.innerHTML = pageItems.map(e => `<tr id="enqView_${esc(e.id)}">
       <td><div style="font-weight:600;">${esc(e.studentName)}</div><div style="font-size:.75rem;color:rgba(255,255,255,.35);">${esc(e.parentName)}</div></td>
       <td><a href="tel:${esc(e.phone)}" style="color:rgba(235,168,33,.8);">${esc(e.phone)}</a></td>
       <td style="font-size:.83rem;">${esc(e.interest)||'—'}</td>
@@ -334,6 +351,18 @@
         </div>
       </td>
     </tr>`).join('');
+
+    // Pagination controls
+    const pc = document.getElementById('paginationControls');
+    if (totalPages <= 1) { pc.innerHTML = ''; return; }
+    const btnStyle = "background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);padding:.4rem .7rem;border-radius:8px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.78rem;";
+    pc.innerHTML = `
+      <button onclick="_currentPage=1;renderEnquiries()" style="${btnStyle}" ${_currentPage===1?'disabled':''}>&laquo;</button>
+      <button onclick="_currentPage--;renderEnquiries()" style="${btnStyle}" ${_currentPage===1?'disabled':''}>&lsaquo; Prev</button>
+      <span style="font-size:.82rem;color:rgba(255,255,255,.5);">${_currentPage} / ${totalPages} (${filtered.length} enquiries)</span>
+      <button onclick="_currentPage++;renderEnquiries()" style="${btnStyle}" ${_currentPage===totalPages?'disabled':''}>Next &rsaquo;</button>
+      <button onclick="_currentPage=${totalPages};renderEnquiries()" style="${btnStyle}" ${_currentPage===totalPages?'disabled':''}>&raquo;</button>
+    `;
   }
 
   function exportEnqCSV() {
