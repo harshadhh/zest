@@ -216,6 +216,9 @@
         </div>
       </div>
 
+      <!-- Pagination -->
+      <div id="paginationControls" style="display:flex;align-items:center;justify-content:center;gap:1rem;padding:1rem 0;"></div>
+
     </div>
   </main>
 </div>
@@ -258,6 +261,8 @@
   let students = [];
   let photoData = '';
   let camStream = null;
+  let _currentPage = 1;
+  const PAGE_SIZE = 25;
 
   function toggleForm() {
     const f = document.getElementById('addStudentForm');
@@ -376,12 +381,20 @@
       return ms && mg;
     });
     document.getElementById('studentCount').textContent = students.length + ' students registered';
+
+    // Pagination
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if (_currentPage > totalPages) _currentPage = totalPages;
+    const startIdx = (_currentPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(startIdx, startIdx + PAGE_SIZE);
+
     const tbody = document.getElementById('studentTableBody');
     if(filtered.length === 0) {
       tbody.innerHTML = '<tr><td colspan="7" style="color:rgba(255,255,255,.3);text-align:center;padding:3rem;">No students found.</td></tr>';
+      document.getElementById('paginationControls').innerHTML = '';
       return;
     }
-    tbody.innerHTML = filtered.map(s => {
+    tbody.innerHTML = pageItems.map(s => {
       const st = (s.feeStatus||'pending').toLowerCase();
       const avatarHtml = s.photo
         ? `<img src="${esc(s.photo)}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;" />`
@@ -399,6 +412,18 @@
           style="background:rgba(239,68,68,.1);color:#EF4444;border:1px solid rgba(239,68,68,.2);padding:.3rem .7rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;">Delete</button></td>
       </tr>`;
     }).join('');
+
+    // Pagination controls
+    const pc = document.getElementById('paginationControls');
+    if (totalPages <= 1) { pc.innerHTML = ''; return; }
+    const btnStyle = "background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);padding:.4rem .7rem;border-radius:8px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.78rem;";
+    pc.innerHTML = `
+      <button onclick="_currentPage=1;renderStudents()" style="${btnStyle}" ${_currentPage===1?'disabled':''}>&#171;</button>
+      <button onclick="_currentPage--;renderStudents()" style="${btnStyle}" ${_currentPage===1?'disabled':''}>&#8249; Prev</button>
+      <span style="font-size:.82rem;color:rgba(255,255,255,.5);">${_currentPage} / ${totalPages} (${filtered.length} total)</span>
+      <button onclick="_currentPage++;renderStudents()" style="${btnStyle}" ${_currentPage===totalPages?'disabled':''}>Next &#8250;</button>
+      <button onclick="_currentPage=${totalPages};renderStudents()" style="${btnStyle}" ${_currentPage===totalPages?'disabled':''}>&raquo;</button>
+    `;
   }
 
   let _saving = false;
@@ -424,7 +449,7 @@
 
     try {
       const student = {
-        id: 'S' + Date.now(),
+        id: ZestSync.uid('S'),
         name, parent: document.getElementById('sParent').value.trim(),
         grade, board: document.getElementById('sBoard').value,
         batch: document.getElementById('sBatch').value,
@@ -434,22 +459,20 @@
         joinDate: new Date().toISOString().split('T')[0], photo: '',
       };
       if (photoData) {
+        // FIX #10: ONLY upload to Firebase Storage. Never store base64 in Firestore
+        // (base64 bloats the student document by up to 700KB, slowing all loads).
+        // On Blaze plan, Storage always works — 30s timeout is generous.
         try {
-          // Try Firebase Storage first (15s timeout)
           const photoUrl = await Promise.race([
             ZestSync.uploadPhoto(student.id, photoData),
-            new Promise(res => setTimeout(() => res(''), 15000))
+            new Promise((_, rej) => setTimeout(() => rej(new Error('Storage timeout after 30s')), 30000))
           ]);
-          if (photoUrl) {
-            student.photo = photoUrl; // ✅ URL from Firebase Storage
-          } else {
-            // Storage failed — only store compressed base64 if small enough
-            const photoBytes = Math.round(photoData.length * 0.75);
-            student.photo = photoBytes <= MAX_PHOTO_BYTES ? photoData : '';
-          }
+          student.photo = photoUrl || '';
         } catch(e) {
-          const photoBytes = Math.round(photoData.length * 0.75);
-          student.photo = photoBytes <= MAX_PHOTO_BYTES ? photoData : '';
+          // Storage failed — save the student WITHOUT the photo, show warning
+          student.photo = '';
+          msgEl.style.cssText = 'display:block;background:rgba(235,168,33,.1);border:1px solid rgba(235,168,33,.3);color:#EBA821;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:.5rem;';
+          msgEl.textContent = '⚠️ Photo could not be uploaded (' + e.message + '). Student saved without photo — you can re-add the photo by editing the student.';
         }
       }
       await ZestSync.appendRow(COLLECTION, LOCAL_KEY, student);
@@ -469,9 +492,9 @@
   }
 
   async function deleteStudent(id) {
-    if (!confirm('Delete this student permanently?')) return;
+    if (!confirm('Delete this student permanently?\n\nThis will also delete all their fee records, test results, and attendance data.')) return;
     try {
-      await ZestSync.deleteRow(COLLECTION, LOCAL_KEY, 'id', id);
+      await ZestSync.deleteStudentCascade(id);
       students = await ZestSync.getAll(COLLECTION, LOCAL_KEY);
       closeStudentPopup();
       renderStudents();
@@ -609,6 +632,17 @@
       }
 
       await ZestSync.updateRow(COLLECTION, LOCAL_KEY, id, updates);
+
+      // If name changed, propagate to all linked fees and results
+      const oldStudent = students.find(s => s.id === id);
+      if (oldStudent && oldStudent.name !== updates.name) {
+        try {
+          await ZestSync.propagateStudentNameChange(id, updates.name);
+        } catch(e) {
+          console.warn('Name propagation partial:', e.message);
+        }
+      }
+
       students = await ZestSync.getAll(COLLECTION, LOCAL_KEY);
       renderStudents();
 
