@@ -378,8 +378,7 @@
     try {
       await ZestSync.appendRow('fees','zest_fees',record);
       fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
-      await ZestSync.updateRow('students','zest_students',s.id,{feeStatus:status});
-      students = await ZestSync.getAll('students','zest_students');
+      await _syncStudentFeeStatus(s.id);  // FIX: same helper as pencil-edit path
       showModalMsg('✅ Payment saved!','ok');
       renderStudentFees();
       setTimeout(() => openPayModal(s.id), 800);
@@ -402,6 +401,21 @@
     document.getElementById('feeEdit_' + feeId).style.display = 'block';
   }
 
+  /**
+   * _syncStudentFeeStatus — recalculates the student's overall feeStatus
+   * from all their fee records (latest date wins) and writes it back
+   * to the students collection. Called after any fee edit or save.
+   */
+  async function _syncStudentFeeStatus(studentId) {
+    const studentFees = fees.filter(f => f.studentId === studentId || ((!f.studentId) && currentStudent && f.studentName === currentStudent.name));
+    if (!studentFees.length) return;
+    // Latest fee record's status wins
+    const latest = studentFees.reduce((a, b) => new Date(a.date) > new Date(b.date) ? a : b);
+    const newStatus = latest.status || 'pending';
+    await ZestSync.updateRow('students', 'zest_students', studentId, { feeStatus: newStatus });
+    students = await ZestSync.getAll('students', 'zest_students');
+  }
+
   async function saveFeeEdit(feeId) {
     try {
       const updates = {
@@ -413,6 +427,8 @@
       if (!updates.amount || !updates.date) { alert('Amount and Date are required.'); return; }
       await ZestSync.updateRow('fees', 'zest_fees', feeId, updates);
       fees = (await ZestSync.getAll('fees', 'zest_fees')).map(normalizeFee);
+      // FIX: sync the student's feeStatus so the list reflects the change immediately
+      if (currentStudent) await _syncStudentFeeStatus(currentStudent.id);
       renderStudentFees();
       showModalMsg('✅ Fee record updated!', 'ok');
       if (currentStudent) setTimeout(() => openPayModal(currentStudent.id), 600);
