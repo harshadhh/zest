@@ -250,7 +250,11 @@ window.ZestSync = (function () {
       }
       // Use .doc(record.id).set() — NOT .add() — so our ID is the Firestore doc ID
       await _db.collection(collection).doc(record.id).set(record);
-      await getAll(collection, localKey);
+      // SPEED FIX: instead of re-fetching ALL docs (slow!), just append to local cache.
+      // getAll is only needed on page load for a full fresh sync.
+      const cache = safeGet(localKey);
+      cache.push(record);
+      safeSet(localKey, cache);
       // Sync to Google Sheets (fire-and-forget)
       _syncToSheets('append', { collection, row: record, headers: Object.keys(record) });
       return record.id;
@@ -383,13 +387,13 @@ window.ZestSync = (function () {
     const ok = await initFirebase();
     if (ok && _db) {
       await _db.collection(collection).doc(docId).update(updates);
-      await getAll(collection, localKey);
-    } else {
-      // Offline fallback
-      const cache = safeGet(localKey);
-      const idx = cache.findIndex(r => r.id === docId);
-      if (idx !== -1) { cache[idx] = { ...cache[idx], ...updates }; safeSet(localKey, cache); }
     }
+    
+    // Update local cache regardless of online/offline
+    const cache = safeGet(localKey);
+    const idx = cache.findIndex(r => r.id === docId);
+    if (idx !== -1) { cache[idx] = { ...cache[idx], ...updates }; safeSet(localKey, cache); }
+
     // Sync to Google Sheets (fire-and-forget)
     _syncToSheets('update', { collection, idField: 'id', idValue: docId, updates });
   }
@@ -411,12 +415,12 @@ window.ZestSync = (function () {
         snap.forEach(doc => batch.delete(doc.ref));
         await batch.commit();
       }
-      await getAll(collection, localKey);
-    } else {
-      // Offline fallback
-      const cache = safeGet(localKey);
-      safeSet(localKey, cache.filter(r => r[idField] !== idValue));
     }
+    
+    // Update local cache regardless of online/offline
+    const cache = safeGet(localKey);
+    safeSet(localKey, cache.filter(r => String(r[idField]) !== String(idValue)));
+
     // Sync to Google Sheets (fire-and-forget)
     _syncToSheets('delete', { collection, idField, idValue });
   }
@@ -533,10 +537,15 @@ window.ZestSync = (function () {
     });
     if (attUpdates > 0) await attBatch.commit();
 
-    // 5. Refresh localStorage caches
-    await getAll('students', 'zest_students');
-    await getAll('fees', 'zest_fees');
-    await getAll('results', 'zest_results');
+    // 5. Clear from local caches directly to prevent massive load times
+    const cStudents = safeGet('zest_students');
+    safeSet('zest_students', cStudents.filter(s => String(s.id) !== String(studentId)));
+
+    const cFees = safeGet('zest_fees');
+    safeSet('zest_fees', cFees.filter(f => String(f.studentId) !== String(studentId)));
+
+    const cRes = safeGet('zest_results');
+    safeSet('zest_results', cRes.filter(r => String(r.studentId) !== String(studentId)));
   }
 
   /**
@@ -564,9 +573,16 @@ window.ZestSync = (function () {
       await batch.commit();
     }
 
-    // Refresh caches
-    await getAll('fees', 'zest_fees');
-    await getAll('results', 'zest_results');
+    // Mutate caches directly to prevent lag
+    const cFees = safeGet('zest_fees');
+    let fChanged = false;
+    cFees.forEach(f => { if (String(f.studentId) === String(studentId)) { f.studentName = newName; fChanged = true; } });
+    if (fChanged) safeSet('zest_fees', cFees);
+
+    const cRes = safeGet('zest_results');
+    let rChanged = false;
+    cRes.forEach(r => { if (String(r.studentId) === String(studentId)) { r.studentName = newName; rChanged = true; } });
+    if (rChanged) safeSet('zest_results', cRes);
   }
 
   // ------------------------------------------------------------------
