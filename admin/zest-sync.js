@@ -84,14 +84,27 @@ window.ZestSync = (function () {
         // Enable offline persistence — fire and forget, NEVER await (can block for seconds)
         _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 
-        // Wait up to 3s for auth state to restore (reduced from 10s — Firebase usually responds < 1s)
+        // Wait up to 12s for auth state to restore. If we timeout too early, guardPage forcefully logs out.
         await new Promise(resolve => {
+          let resolved = false;
           const unsub = _auth.onAuthStateChanged(user => {
+            if (resolved) { _currentUser = user; return; }
+            resolved = true;
             _currentUser = user;
             unsub();
             resolve();
           });
-          setTimeout(resolve, 3000);
+          setTimeout(() => {
+            if (!resolved) {
+              resolved = true;
+              unsub();
+              // If timeout hits, trust sessionStorage so we don't aggressively boot people on slow networks
+              if (sessionStorage.getItem('zest_admin_auth') === 'true') {
+                _currentUser = { uid: 'offline_cached_user' }; 
+              }
+              resolve();
+            }
+          }, 12000);
         });
 
         _ready = true;
@@ -817,11 +830,20 @@ window.ZestSync = (function () {
   async function guardPage(callback) {
     document.body.style.visibility = 'hidden';
     const ok = await initFirebase();
+    
+    // If Firebase failed or user is not logged in via Firebase
     if (!ok || !_currentUser) {
-      sessionStorage.removeItem('zest_admin_auth');
-      window.location.href = 'index.html';
-      return;
+      // 🚨 FIX: Be forgiving. If they already had access before (sessionStorage is true), let them stay in 'Offline Mode'.
+      // Otherwise, an invalid Firebase config or offline network will instantly kick them out.
+      if (sessionStorage.getItem('zest_admin_auth') === 'true') {
+        console.warn('[ZestSync] Firebase auth failed, but session cached. Entering offline mode.');
+      } else {
+        sessionStorage.removeItem('zest_admin_auth');
+        window.location.href = 'index.html';
+        return;
+      }
     }
+    
     sessionStorage.setItem('zest_admin_auth', 'true');
     document.body.style.visibility = '';
     if (typeof callback === 'function') callback();
