@@ -237,7 +237,8 @@
       const pct = Math.round((marks/total)*100);
       const result = {id:ZestSync.uid('R'),studentId,studentName:student?student.name:'',grade:student?student.grade:'',test,subject,marks,total,pct,date,remarks};
       await ZestSync.appendRow('results','zest_results',result);
-      results = await ZestSync.getAll('results','zest_results');
+      // Push to local array directly — no Firestore re-fetch needed
+      results.push(result);
       ['rTest','rMarks','rTotal','rRemarks'].forEach(id => document.getElementById(id).value='');
       msgEl.textContent = '✅ Result saved!';
       msgEl.style.cssText = 'display:block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green);padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;';
@@ -254,7 +255,8 @@
     if(!confirm('Delete this result?')) return;
     try {
       await ZestSync.deleteRow('results','zest_results','id',id);
-      results = await ZestSync.getAll('results','zest_results');
+      // Remove from local array directly — no Firestore re-fetch needed
+      results = results.filter(r => r.id !== id);
       renderResults();
     } catch(e) { alert('Delete failed: ' + e.message); }
   }
@@ -355,7 +357,9 @@
         remarks: document.getElementById('redit_remarks_' + id).value.trim(),
       };
       await ZestSync.updateRow('results', 'zest_results', id, updates);
-      results = await ZestSync.getAll('results', 'zest_results');
+      // Update local array in-place — no Firestore re-fetch needed
+      const idx = results.findIndex(r => r.id === id);
+      if (idx !== -1) results[idx] = { ...results[idx], ...updates };
       renderResults();
     } catch(e) { alert('Error: ' + e.message); }
   }
