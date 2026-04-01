@@ -24,12 +24,6 @@ window.ZestSync = (function () {
     }
     if (!cfg) return null;
     
-    // FIX FOR FIREBASE STORAGE: Modern configs use .firebasestorage.app
-    // but the Firebase compat SDK requires .appspot.com to initialize successfully.
-    if (cfg.storageBucket && cfg.storageBucket.endsWith('.firebasestorage.app')) {
-      cfg.storageBucket = cfg.storageBucket.replace('.firebasestorage.app', '.appspot.com');
-    }
-    
     return cfg;
   }
 
