@@ -23,9 +23,6 @@ window.ZestSync = (function () {
       } catch (e) {}
     }
     if (!cfg) return null;
-    // Fix new Firebase projects using firebasestorage.app instead of appspot.com
-    if (cfg.storageBucket && cfg.storageBucket.endsWith('.firebasestorage.app'))
-      cfg.storageBucket = cfg.storageBucket.replace('.firebasestorage.app', '.appspot.com');
     return cfg;
   }
 
@@ -84,19 +81,17 @@ window.ZestSync = (function () {
         _db      = window.firebase.firestore();
         _storage = window.firebase.storage();
 
-        // Enable offline persistence
-        try {
-          await _db.enablePersistence({ synchronizeTabs: true });
-        } catch (e) { /* non-fatal */ }
+        // Enable offline persistence — fire and forget, NEVER await (can block for seconds)
+        _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 
-        // Wait up to 10s for auth state to restore
+        // Wait up to 3s for auth state to restore (reduced from 10s — Firebase usually responds < 1s)
         await new Promise(resolve => {
           const unsub = _auth.onAuthStateChanged(user => {
             _currentUser = user;
             unsub();
             resolve();
           });
-          setTimeout(resolve, 10000);
+          setTimeout(resolve, 3000);
         });
 
         _ready = true;
@@ -251,9 +246,13 @@ window.ZestSync = (function () {
       // Use .doc(record.id).set() — NOT .add() — so our ID is the Firestore doc ID
       await _db.collection(collection).doc(record.id).set(record);
       // SPEED FIX: instead of re-fetching ALL docs (slow!), just append to local cache.
-      // getAll is only needed on page load for a full fresh sync.
+      // Strip photo (base64 blob / large Storage URL) from localStorage — only keep the URL reference.
+      const cacheRecord = { ...record };
+      if (cacheRecord.photo && cacheRecord.photo.startsWith('data:')) {
+        cacheRecord.photo = ''; // Never store raw base64 in localStorage — crashes the tab
+      }
       const cache = safeGet(localKey);
-      cache.push(record);
+      cache.push(cacheRecord);
       safeSet(localKey, cache);
       // Sync to Google Sheets (fire-and-forget)
       _syncToSheets('append', { collection, row: record, headers: Object.keys(record) });
@@ -261,8 +260,10 @@ window.ZestSync = (function () {
     } else {
       // Offline fallback: append to localStorage only
       const id = record.id || ('local_' + Date.now());
+      const cacheRecord = { ...record, id };
+      if (cacheRecord.photo && cacheRecord.photo.startsWith('data:')) cacheRecord.photo = '';
       const cache = safeGet(localKey);
-      cache.push({ ...record, id });
+      cache.push(cacheRecord);
       safeSet(localKey, cache);
       return id;
     }
