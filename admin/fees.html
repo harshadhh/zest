@@ -381,7 +381,8 @@
     const record = {id:ZestSync.uid('F'),studentId:s.id,studentName:s.name,grade:s.grade||'',amount,date:rawDate.split('T')[0],dueDate,status,method,notes};
     try {
       await ZestSync.appendRow('fees','zest_fees',record);
-      fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
+      // Push to local array directly — no Firestore re-fetch needed
+      fees.push(normalizeFee(record));
       await _syncStudentFeeStatus(s.id);  // FIX: same helper as pencil-edit path
       showModalMsg('✅ Payment saved!','ok');
       renderStudentFees();
@@ -394,7 +395,8 @@
     if(!confirm('Delete this payment record?')) return;
     try {
       await ZestSync.deleteRow('fees','zest_fees','id',feeId);
-      fees = (await ZestSync.getAll('fees','zest_fees')).map(normalizeFee);
+      // Remove from local array directly — no Firestore re-fetch needed
+      fees = fees.filter(f => f.id !== feeId);
       renderStudentFees();
       if(currentStudent) openPayModal(currentStudent.id);
     } catch(e) { showModalMsg('❌ Delete failed: ' + e.message, 'err'); }
@@ -417,7 +419,9 @@
     const latest = studentFees.reduce((a, b) => new Date(a.date) > new Date(b.date) ? a : b);
     const newStatus = latest.status || 'pending';
     await ZestSync.updateRow('students', 'zest_students', studentId, { feeStatus: newStatus });
-    students = await ZestSync.getAll('students', 'zest_students');
+    // Update local students array in-place — no Firestore re-fetch needed
+    const idx = students.findIndex(s => s.id === studentId);
+    if (idx !== -1) students[idx] = { ...students[idx], feeStatus: newStatus };
   }
 
   async function saveFeeEdit(feeId) {
@@ -430,7 +434,9 @@
       };
       if (!updates.amount || !updates.date) { alert('Amount and Date are required.'); return; }
       await ZestSync.updateRow('fees', 'zest_fees', feeId, updates);
-      fees = (await ZestSync.getAll('fees', 'zest_fees')).map(normalizeFee);
+      // Update local array in-place — no Firestore re-fetch needed
+      const idx = fees.findIndex(f => f.id === feeId);
+      if (idx !== -1) fees[idx] = normalizeFee({ ...fees[idx], ...updates });
       // FIX: sync the student's feeStatus so the list reflects the change immediately
       if (currentStudent) await _syncStudentFeeStatus(currentStudent.id);
       renderStudentFees();
