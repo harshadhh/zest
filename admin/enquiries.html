@@ -235,7 +235,8 @@
         date:       new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}),
       };
       await ZestSync.appendRow('enquiries','zest_enquiries',newEnq);
-      enquiries = await ZestSync.getAll('enquiries','zest_enquiries');
+      // Push to local array directly — no Firestore re-fetch needed
+      enquiries.push(newEnq);
       ['eStudentName','eParentName','ePhone','eEmail','eMessage'].forEach(id => document.getElementById(id).value='');
       ['eInterest','eSource'].forEach(id => document.getElementById(id).selectedIndex = 0);
       msgEl.textContent = '✅ Enquiry logged!';
@@ -252,7 +253,9 @@
   async function updateStatus(id, status) {
     const enq = enquiries.find(e => e.id===id); if(!enq) return;
     await ZestSync.updateRow('enquiries','zest_enquiries',id,{status});
-    enquiries = await ZestSync.getAll('enquiries','zest_enquiries');
+    // Update local array in-place — no Firestore re-fetch needed
+    const enqIdx = enquiries.findIndex(e => e.id === id);
+    if (enqIdx !== -1) enquiries[enqIdx] = { ...enquiries[enqIdx], status };
     renderEnquiries();
   }
 
@@ -273,7 +276,9 @@
       };
       if (!updates.studentName || !updates.phone) { alert('Student name and phone are required.'); return; }
       await ZestSync.updateRow('enquiries', 'zest_enquiries', id, updates);
-      enquiries = await ZestSync.getAll('enquiries', 'zest_enquiries');
+      // Update local array in-place — no Firestore re-fetch needed
+      const idx2 = enquiries.findIndex(e => e.id === id);
+      if (idx2 !== -1) enquiries[idx2] = { ...enquiries[idx2], ...updates };
       renderEnquiries();
     } catch(e) { alert('Error: ' + e.message); }
   }
@@ -282,7 +287,8 @@
     if(!confirm('Delete this enquiry?')) return;
     try {
       await ZestSync.deleteRow('enquiries','zest_enquiries','id',id);
-      enquiries = await ZestSync.getAll('enquiries','zest_enquiries');
+      // Remove from local array directly — no Firestore re-fetch needed
+      enquiries = enquiries.filter(e => e.id !== id);
       renderEnquiries();
     } catch(e) { alert('Delete failed: ' + e.message); }
   }
