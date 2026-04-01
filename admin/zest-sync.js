@@ -23,6 +23,13 @@ window.ZestSync = (function () {
       } catch (e) {}
     }
     if (!cfg) return null;
+    
+    // FIX FOR FIREBASE STORAGE: Modern configs use .firebasestorage.app
+    // but the Firebase compat SDK requires .appspot.com to initialize successfully.
+    if (cfg.storageBucket && cfg.storageBucket.endsWith('.firebasestorage.app')) {
+      cfg.storageBucket = cfg.storageBucket.replace('.firebasestorage.app', '.appspot.com');
+    }
+    
     return cfg;
   }
 
@@ -607,32 +614,20 @@ window.ZestSync = (function () {
    * uploadPhoto — upload to Firebase Storage photos/{studentId}.jpg
    * Returns download URL. Has 8s timeout so it doesn't block saves.
    */
-  /**
-   * _dataUrlToBlob — convert a base64 dataURL string to a Blob.
-   * Firebase Storage ref.put() requires a Blob/File, not a string.
-   */
-  function _dataUrlToBlob(dataUrl) {
-    const parts = dataUrl.split(',');
-    const mime  = parts[0].match(/:(.*?);/)[1];
-    const bStr  = atob(parts[1]);
-    const arr   = new Uint8Array(bStr.length);
-    for (let i = 0; i < bStr.length; i++) arr[i] = bStr.charCodeAt(i);
-    return new Blob([arr], { type: mime });
-  }
+  // Firebase Native .putString handles data URLs directly, so _dataUrlToBlob is no longer needed
 
   async function uploadPhoto(studentId, fileOrDataUrl) {
     const ok = await initFirebase();
     if (!ok || !_storage) throw new Error('Storage not available');
 
-    // Accept either a File/Blob OR a base64 dataURL string
-    const blob = (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:'))
-      ? _dataUrlToBlob(fileOrDataUrl)
-      : fileOrDataUrl;
-
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Photo upload timed out')), 30000);
       const ref  = _storage.ref('photos/' + studentId + '.jpg');
-      const task = ref.put(blob);
+      
+      // Use Firebase's native method for data URLs, otherwise fallback to standard put()
+      const isDataUrl = typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:');
+      const task = isDataUrl ? ref.putString(fileOrDataUrl, 'data_url') : ref.put(fileOrDataUrl);
+      
       task.then(async () => {
         clearTimeout(timeout);
         try {
