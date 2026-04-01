@@ -458,47 +458,46 @@
         address: document.getElementById('sAddress').value.trim(),
         joinDate: new Date().toISOString().split('T')[0], photo: '',
       };
-      let photoUploadFailed = false;
-      if (photoData) {
-        // FIX #10: Try Firebase Storage first. Fall back to base64 only for small images.
-        try {
-          console.log('[Photo] Starting upload to Firebase Storage for student:', student.id);
-          const photoUrl = await Promise.race([
-            ZestSync.uploadPhoto(student.id, photoData),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('Storage timeout after 30s')), 30000))
-          ]);
-          console.log('[Photo] Upload successful, URL:', photoUrl ? photoUrl.slice(0,60) + '...' : 'EMPTY');
-          student.photo = photoUrl || '';
-        } catch(e) {
-          console.error('[Photo] Firebase Storage upload failed:', e.message, e);
-          // Safe fallback: store base64 only if image is small enough (under 200KB)
-          const photoBytes = Math.round(photoData.length * 0.75);
-          if (photoBytes <= 200 * 1024) {
-            student.photo = photoData;
-            console.warn('[Photo] Using base64 fallback (small image, ' + Math.round(photoBytes/1024) + 'KB)');
-          } else {
-            student.photo = '';
-            photoUploadFailed = true;
-          }
-        }
-      }
+
+      // ── STEP 1: Save student immediately (< 1s) ──────────────────────
       await ZestSync.appendRow(COLLECTION, LOCAL_KEY, student);
-      students = await ZestSync.getAll(COLLECTION, LOCAL_KEY);
+      students.push({ ...student });
       ['sName','sParent','sPhone','sFee','sAddress'].forEach(id => document.getElementById(id).value = '');
       ['sGrade','sBoard','sBatch','sFeeStatus'].forEach(id => document.getElementById(id).selectedIndex = 0);
       removePhoto();
-      if (photoUploadFailed) {
-        msgEl.style.cssText = 'display:block;background:rgba(235,168,33,.1);border:1px solid rgba(235,168,33,.3);color:#EBA821;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:.5rem;';
-        msgEl.textContent = '⚠️ Student saved but photo could not be uploaded (image too large for fallback). Open DevTools (F12) → Console to see the exact error, then check Firebase Storage Rules.';
-      } else {
-        msgEl.style.cssText = 'display:block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green);padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:1rem;';
-        msgEl.textContent = '✅ Student registered & synced to Firebase!';
-        setTimeout(() => msgEl.style.display = 'none', 4000);
-      }
+      msgEl.style.cssText = 'display:block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green);padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:1rem;';
+      msgEl.textContent = '✅ Student saved! ' + (photoData ? '📷 Photo uploading in background...' : '');
+      _saving = false; btn.disabled = false; btn.innerHTML = '✅ Register Student';
       renderStudents();
+
+      // ── STEP 2: Upload photo in background (non-blocking) ─────────────
+      if (photoData) {
+        const capturedPhoto = photoData;
+        const capturedId    = student.id;
+        photoData = ''; // Clear immediately so the form doesn't hold the big blob
+        ZestSync.uploadPhoto(capturedId, capturedPhoto).then(photoUrl => {
+          if (!photoUrl) return;
+          // Patch Firestore and local cache with the real Storage URL
+          ZestSync.updateRow(COLLECTION, LOCAL_KEY, capturedId, { photo: photoUrl });
+          const idx = students.findIndex(s => s.id === capturedId);
+          if (idx !== -1) students[idx].photo = photoUrl;
+          // Update the success message
+          msgEl.textContent = '✅ Student saved & photo uploaded successfully!';
+          setTimeout(() => { if(msgEl) msgEl.style.display = 'none'; }, 4000);
+          renderStudents(); // Refresh table to show photo avatar
+        }).catch(err => {
+          console.error('[Photo] Background upload failed:', err.message);
+          msgEl.style.cssText = 'display:block;background:rgba(235,168,33,.1);border:1px solid rgba(235,168,33,.3);color:#EBA821;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:.5rem;';
+          msgEl.textContent = '⚠️ Student saved, but photo upload failed: ' + err.message + '. Check Firebase Console → Storage → Rules.';
+        });
+        setTimeout(() => msgEl.style.display = 'none', 4000);
+        return; // Already reset saving state above
+      }
+      setTimeout(() => msgEl.style.display = 'none', 4000);
     } catch(e) {
       msgEl.style.cssText = 'display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:1rem;';
       msgEl.textContent = '❌ Error: ' + e.message;
+
     }
     _saving = false; btn.disabled = false; btn.innerHTML = '✅ Register Student';
   }
@@ -507,7 +506,8 @@
     if (!confirm('Delete this student permanently?\n\nThis will also delete all their fee records, test results, and attendance data.')) return;
     try {
       await ZestSync.deleteStudentCascade(id);
-      students = await ZestSync.getAll(COLLECTION, LOCAL_KEY);
+      // Read from local cache (already updated by deleteStudentCascade) — no Firestore re-fetch
+      students = students.filter(s => String(s.id) !== String(id));
       closeStudentPopup();
       renderStudents();
     } catch(e) {
@@ -645,17 +645,17 @@
 
       await ZestSync.updateRow(COLLECTION, LOCAL_KEY, id, updates);
 
-      // If name changed, propagate to all linked fees and results
+      // Update local array in-place — no Firestore re-fetch needed (that caused the 20s delay)
       const oldStudent = students.find(s => s.id === id);
-      if (oldStudent && oldStudent.name !== updates.name) {
-        try {
-          await ZestSync.propagateStudentNameChange(id, updates.name);
-        } catch(e) {
-          console.warn('Name propagation partial:', e.message);
-        }
-      }
+      const idx = students.findIndex(s => s.id === id);
+      if (idx !== -1) students[idx] = { ...students[idx], ...updates };
 
-      students = await ZestSync.getAll(COLLECTION, LOCAL_KEY);
+      // If name changed, propagate to linked fees/results (fire-and-forget — doesn't block UI)
+      if (oldStudent && oldStudent.name !== updates.name) {
+        ZestSync.propagateStudentNameChange(id, updates.name).catch(e =>
+          console.warn('[ZestSync] Name propagation partial:', e.message)
+        );
+      }
       renderStudents();
 
       msgEl.textContent = '✅ Changes saved!';
