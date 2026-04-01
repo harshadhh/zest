@@ -481,16 +481,18 @@
           ZestSync.updateRow(COLLECTION, LOCAL_KEY, capturedId, { photo: photoUrl });
           const idx = students.findIndex(s => s.id === capturedId);
           if (idx !== -1) students[idx].photo = photoUrl;
-          // Update the success message
+          // Show success — re-set display:block in case it was hidden
+          msgEl.style.cssText = 'display:block;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--green);padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:1rem;';
           msgEl.textContent = '✅ Student saved & photo uploaded successfully!';
-          setTimeout(() => { if(msgEl) msgEl.style.display = 'none'; }, 4000);
+          setTimeout(() => { if(msgEl) msgEl.style.display = 'none'; }, 5000);
           renderStudents(); // Refresh table to show photo avatar
         }).catch(err => {
           console.error('[Photo] Background upload failed:', err.message);
-          msgEl.style.cssText = 'display:block;background:rgba(235,168,33,.1);border:1px solid rgba(235,168,33,.3);color:#EBA821;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:.5rem;';
+          // Show error clearly — stays visible so user can read it
+          msgEl.style.cssText = 'display:block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#FCA5A5;padding:.75rem 1rem;border-radius:10px;font-size:.88rem;font-weight:600;margin-top:1rem;';
           msgEl.textContent = '⚠️ Student saved, but photo upload failed: ' + err.message + '. Check Firebase Console → Storage → Rules.';
         });
-        setTimeout(() => msgEl.style.display = 'none', 4000);
+        // No auto-hide here — the .then/.catch above control visibility
         return; // Already reset saving state above
       }
       setTimeout(() => msgEl.style.display = 'none', 4000);
